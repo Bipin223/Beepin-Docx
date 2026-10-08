@@ -130,7 +130,16 @@ function normalizeAIText(raw) {
     if (/^section\s+[a-d]/i.test(s) && !s.startsWith("#")) return "## " + s;
     return line;
   }).join("\n");
-  return t.trim();
+  // one paragraph per question (fence-aware) so preview and Word match
+  const qlines = t.split("\n");
+  let inFence = false;
+  const qout = [];
+  qlines.forEach(line => {
+    if (/^```/.test(line.trim())) inFence = !inFence;
+    if (!inFence && /^Q\d+\./.test(line.trim()) && qout.length && qout[qout.length - 1].trim() !== "") qout.push("");
+    qout.push(line);
+  });
+  return qout.join("\n").trim();
 }
 
 /* ---------- Header ---------- */
@@ -192,6 +201,7 @@ function wrapMathSrc(root) {
       const sp = document.createElement("span");
       sp.className = "math-src";
       sp.dataset.latex = tok.startsWith("$$") ? tok.slice(2, -2) : tok.slice(1, -1);
+      sp.dataset.display = tok.startsWith("$$") ? "1" : "";
       sp.setAttribute("contenteditable", "false");
       sp.textContent = tok;
       frag.appendChild(sp);
