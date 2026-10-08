@@ -124,6 +124,7 @@ function normalizeAIText(raw) {
   t = t.replace(/(?:^|\n)\s*(?:Question|Q\.?|Ques\.?)\s*(\d+)\s*[:.)\-–—]?\s*/gi, "\nQ$1. ");
   t = t.replace(/(?:^|\n)\s*(\d{1,2})\s*[.)]\s+(?=[A-Z])/g, "\nQ$1. ");
   t = t.replace(/[\[\(]\s*(\d{1,3})\s*(?:marks?|m)?\s*[\]\)]\s*$/gim, " [$1 marks]");
+  t = t.replace(/[ \t]+\[(\d{1,3}\s*marks?)\]/gi, " [$1]"); // exactly one space before [marks]
   t = t.replace(/\\\(\s*/g, "$").replace(/\s*\\\)/g, "$").replace(/\\\[\s*/g, "$$").replace(/\s*\\\]/g, "$$");
   t = t.split("\n").map(line => {
     const s = line.trim();
@@ -798,18 +799,20 @@ function mathKid(latex) {
     try { return new docx.Math({ children: latexToMathKids(latex) }); }
     catch { /* fall through to text */ }
   }
-  return new docx.TextRun({ text: latexFallbackText(latex), size: 24 });
+  return new docx.TextRun({ text: latexFallbackText(latex), size: 23 });
 }
-function runsFromNode(node, st = {}) {
-  const size = st.size || 24;
+function runsFromNodes(nodes, st = {}) {
+  const size = st.size || 23;
+  const font = st.mono ? "Consolas" : (st.font || "Georgia"); // preview paper is Georgia — match it
+  const color = st.mono ? "0f172a" : st.color;
   const out = [];
-  node.childNodes.forEach(ch => {
+  nodes.forEach(ch => {
     if (ch.nodeType === 3) {
       if (!ch.textContent) return;
       out.push(new docx.TextRun({ text: ch.textContent, size,
         bold: st.b || undefined, italics: st.i || undefined,
         underline: st.u ? {} : undefined, strike: st.s || undefined,
-        font: st.mono ? "Consolas" : undefined, color: st.mono ? "0f172a" : undefined }));
+        font, color }));
     } else if (ch.nodeType === 1) {
       const tag = ch.tagName.toLowerCase();
       if (ch.classList && ch.classList.contains("math-src")) {
@@ -818,8 +821,12 @@ function runsFromNode(node, st = {}) {
       else if (tag === "br") out.push(new docx.TextRun({ text: "", size, break: 1 }));
       else if (tag === "img" || tag === "hr" || tag === "button" || tag === "input") return;
       else if (tag === "span" && ch.classList.contains("marks")) {
+        // preview floats marks to the right margin → right tab stop + small grey text
         const t = ch.textContent.replace(/[\[\]]/g, "").trim();
-        if (t) out.push(new docx.TextRun({ text: "  [" + t + "]", size }));
+        if (t) {
+          out.push(new docx.TextRun({ children: [new docx.Tab()], size: 20, font: "Georgia" }));
+          out.push(new docx.TextRun({ text: "[" + t + "]", size: 20, font: "Georgia", color: "4b5563" }));
+        }
       }
       else {
         const s2 = { ...st };
@@ -828,58 +835,123 @@ function runsFromNode(node, st = {}) {
         if (tag === "u") s2.u = true;
         if (tag === "s" || tag === "strike" || tag === "del") s2.s = true;
         if (tag === "code") s2.mono = true;
-        runsFromNode(ch, s2).forEach(r => out.push(r));
+        runsFromNodes([...ch.childNodes], s2).forEach(r => out.push(r));
       }
     }
   });
   return out;
 }
-function blocksFromEl(el) {
+function runsFromNode(node, st = {}) { return runsFromNodes([...node.childNodes], st); }
+function blocksFromEl(el, wrap = {}) {
   const tag = el.tagName.toLowerCase();
-  if (tag === "hr") return [new docx.Paragraph({ thematicBreak: true })];
+  const LINE = { line: 420, lineRule: docx.LineRuleType.AUTO }; // preview: 15px Georgia, line-height 1.75
+  const TABPOS = 9026; // usable width = 11906 − 1440 − 1440 margins
+  const tabStops = (el.querySelector && el.querySelector(".marks"))
+    ? [{ type: docx.TabStopType.RIGHT, position: TABPOS }] : undefined;
+
+  if (tag === "hr") return [new docx.Paragraph({ border: { bottom: { style: docx.BorderStyle.SINGLE, size: 12, color: "6b7280" } }, spacing: { before: 180, after: 180 } })];
   if (/^h[1-3]$/.test(tag)) {
-    const sz = tag === "h1" ? 34 : tag === "h2" ? 30 : 26;
-    const center = tag === "h1" ? { alignment: docx.AlignmentType.CENTER } : {};
-    return [new docx.Paragraph({ children: runsFromNode(el, { size: sz, b: true }), spacing: { before: 200, after: 120 }, ...center })];
+    const cfg = tag === "h1" ? { size: 52, center: true } : tag === "h2" ? { size: 32, center: true, color: "4b5563" } : { size: 27, color: "4b5563" };
+    return [new docx.Paragraph({
+      children: runsFromNode(el, { size: cfg.size, b: true, font: "Poppins", color: cfg.color }),
+      spacing: { before: 180, after: 180, ...LINE },
+      alignment: cfg.center ? docx.AlignmentType.CENTER : undefined,
+      keepNext: true,
+      ...wrap
+    })];
   }
   if (tag === "pre") {
     const kids = [];
     el.innerText.split("\n").forEach((ln, k) => {
-      if (k) kids.push(new docx.TextRun({ text: "", size: 20, break: 1 }));
-      kids.push(new docx.TextRun({ text: ln || " ", size: 20, font: "Consolas", color: "0f172a" }));
+      if (k) kids.push(new docx.TextRun({ text: "", size: 19, break: 1 }));
+      kids.push(new docx.TextRun({ text: ln || " ", size: 19, font: "Consolas", color: "f0e9db" }));
     });
-    return [new docx.Paragraph({ children: kids, shading: { fill: "F1F5F9" }, spacing: { after: 200 } })];
+    return [new docx.Paragraph({ children: kids, shading: { fill: "22201c" }, spacing: { before: 180, after: 180, line: 360, lineRule: docx.LineRuleType.AUTO }, ...wrap })];
   }
   if (tag === "table") {
+    const bd = { style: docx.BorderStyle.SINGLE, size: 6, color: "9ca3af" };
     const rows = [...el.querySelectorAll("tr")].map((tr, ri) => new docx.TableRow({
       children: [...tr.querySelectorAll("th,td")].map(td => {
         const isHead = td.tagName === "TH" || (ri === 0 && tr.querySelectorAll("th").length > 0);
         return new docx.TableCell({
-          children: [new docx.Paragraph({ children: runsFromNode(td) })],
-          ...(isHead ? { shading: { fill: "EDE9FE" } } : {})
+          children: [new docx.Paragraph({ children: runsFromNode(td, { size: 20, font: "Poppins" }), spacing: { line: 300, lineRule: docx.LineRuleType.AUTO } })],
+          ...(isHead ? { shading: { fill: "f1ede4" } } : {})
         });
       })
     }));
-    return rows.length ? [new docx.Table({ rows, width: { size: 100, type: docx.WidthType.PERCENTAGE } })] : [];
+    return rows.length ? [new docx.Table({
+      rows, width: { size: 100, type: docx.WidthType.PERCENTAGE },
+      borders: { top: bd, bottom: bd, left: bd, right: bd, insideHorizontal: bd, insideVertical: bd }
+    })] : [];
   }
   if (tag === "blockquote") {
+    // preview: amber left bar on a warm paper tint
+    const bq = { shading: { fill: "faf6ee" }, border: { left: { style: docx.BorderStyle.SINGLE, size: 18, color: "b26a2b", space: 8 } } };
     const inner = [...el.children].filter(c => /^(p|h\d|pre|ul|ol|div)$/i.test(c.tagName));
-    if (inner.length) { const kids = []; inner.forEach(b => blocksFromEl(b).forEach(x => kids.push(x))); return kids; }
-    return [new docx.Paragraph({ children: runsFromNode(el), shading: { fill: "F5F3FF" } })];
+    const kids = [];
+    (inner.length ? inner : [el]).forEach(b => blocksFromEl(b, { ...bq, ...wrap }).forEach(x => kids.push(x)));
+    return kids;
   }
   if (tag === "ul" || tag === "ol") {
     const kids = [];
-    [...el.children].forEach(li => {
-      if (li.tagName === "LI") kids.push(new docx.Paragraph({ children: [new docx.TextRun({ text: "•  ", size: 24 }), ...runsFromNode(li)], spacing: { after: 80 } }));
-    });
+    [...el.children].forEach(li => { if (li.tagName === "LI") blocksFromEl(li, wrap).forEach(x => kids.push(x)); });
     return kids;
   }
-  if (tag === "li") return [new docx.Paragraph({ children: [new docx.TextRun({ text: "•  ", size: 24 }), ...runsFromNode(el)], spacing: { after: 80 } })];
-  const center = el.querySelector && el.querySelector(".katex-display") ? { alignment: docx.AlignmentType.CENTER } : {};
-  const extra = el.className === "q" ? { shading: { fill: "F8FAFC" } } : {};
-  const runs = runsFromNode(el);
-  if (!runs.length) runs.push(new docx.TextRun({ text: "", size: 24 }));
-  return [new docx.Paragraph({ children: runs, spacing: { after: 140 }, ...center, ...extra })];
+  if (tag === "li") return [new docx.Paragraph({
+    children: [new docx.TextRun({ text: "•  ", size: 23, font: "Georgia" }), ...runsFromNode(el, { size: 23 })],
+    spacing: { after: 150, ...LINE }, ...wrap
+  })];
+
+  /* ---- body paragraph (one Word paragraph per preview block) ---- */
+  const q = el.classList && el.classList.contains("q");
+  const para = (kids, spacing, over = {}) => new docx.Paragraph({
+    children: kids.length ? kids : [new docx.TextRun({ text: "", size: 23, font: "Georgia" })],
+    spacing: { ...LINE, ...spacing },
+    tabStops,
+    keepLines: q || undefined,
+    ...wrap,
+    ...over
+  });
+  const nodes = [...el.childNodes];
+  const isDisp = n => n.nodeType === 1 && n.classList && n.classList.contains("math-src") && n.dataset.display;
+
+  if (!nodes.some(isDisp)) return [para(runsFromNodes(nodes, { size: 23 }), { after: q ? 180 : 225 })];
+
+  // a $$…$$ block becomes its own centered line, exactly like the preview renders it
+  const kids = [];
+  let seg = [];
+  const blank = s => !s.map(n => n.textContent || "").join("").trim();
+  const flush = (spacing, over = {}) => {
+    const src = seg; seg = [];
+    if (blank(src)) return;
+    let out = src;
+    if (spacing.trimEdges) { // glued to an equation: drop the edge spaces the preview absorbs
+      out = src.map(n => n.cloneNode(true));
+      const texts = [];
+      const walk = n => { if (n.nodeType === 3) texts.push(n); else [...n.childNodes].forEach(walk); };
+      out.forEach(walk);
+      if (texts.length) {
+        texts[0].textContent = texts[0].textContent.replace(/^\s+/, "");
+        texts[texts.length - 1].textContent = texts[texts.length - 1].textContent.replace(/\s+$/, "");
+      }
+    }
+    const sp = { ...spacing }; delete sp.trimEdges;
+    kids.push(para(runsFromNodes(out, { size: 23 }), sp, over));
+  };
+  nodes.forEach(ch => {
+    if (isDisp(ch)) {
+      flush({ after: 0, trimEdges: true }, { keepNext: true });
+      kids.push(new docx.Paragraph({
+        children: [mathKid(ch.dataset.latex || ch.textContent)],
+        alignment: docx.AlignmentType.CENTER,
+        spacing: { before: 90, after: 90, ...LINE },
+        ...wrap
+      }));
+    } else seg.push(ch);
+  });
+  flush({ after: q ? 180 : 225, trimEdges: true });
+  if (!kids.length) kids.push(para([], { after: q ? 180 : 225 }));
+  return kids;
 }
 
 /* ---------- Export ---------- */
@@ -892,17 +964,43 @@ async function exportDocx() {
     const kids = [];
     if ($("#cHeader").checked && $("#paperHead").style.display !== "none") {
       const H = id => (((document.getElementById(id) || {}).textContent) || "").trim();
-      kids.push(new docx.Paragraph({ children: [new docx.TextRun({ text: H("pSchool") || $("#sSchool").value, bold: true, size: 40 })], alignment: docx.AlignmentType.CENTER }));
-      kids.push(new docx.Paragraph({ children: [new docx.TextRun({ text: H("pTitle") || $("#sTitle").value, bold: true, size: 28 })], alignment: docx.AlignmentType.CENTER }));
-      kids.push(new docx.Paragraph({ children: [new docx.TextRun({ text: (H("pMeta") || `${$("#sSub").value}  •  ${$("#sMeta").value}`).replace(/\s+/g, " "), size: 20, color: "555555" })], alignment: docx.AlignmentType.CENTER }));
-      const instr = (H("pInstr") || $("#sInstr").value || "").replace(/\s+/g, " ");
-      if (instr) kids.push(new docx.Paragraph({ children: [new docx.TextRun({ text: instr, size: 22 })], spacing: { after: 240 } }));
+      const C = docx.AlignmentType.CENTER;
+      const L = { line: 300, lineRule: docx.LineRuleType.AUTO };
+      kids.push(new docx.Paragraph({ children: [new docx.TextRun({ text: H("pSchool") || $("#sSchool").value, bold: true, size: 52, font: "Poppins" })], alignment: C, spacing: { after: 80, ...L } }));      // preview h1: 26px Poppins
+      kids.push(new docx.Paragraph({ children: [new docx.TextRun({ text: H("pTitle") || $("#sTitle").value, bold: true, size: 32, color: "4b5563", font: "Poppins" })], alignment: C, spacing: { after: 60, ...L } })); // preview h2: 16px Poppins
+      const meta = (H("pMeta") || `${$("#sSub").value}  •  ${$("#sMeta").value}`).replace(/\s+/g, " ");
+      kids.push(new docx.Paragraph({ children: [new docx.TextRun({ text: meta, size: 20, color: "6b7280", font: "Georgia" })], alignment: C, spacing: { after: 0, ...L } })); // preview .pmeta: 13px
+      kids.push(new docx.Paragraph({ children: [new docx.TextRun({ text: "", size: 2 })], border: { bottom: { style: docx.BorderStyle.SINGLE, size: 6, color: "b9b3a5" } }, spacing: { before: 180, after: 180 } })); // preview .prule
+      const instr = (H("pInstr") || $("#sInstr").value || "").replace(/\s+$/, "");
+      if (instr) { // preview .pinstr: 13px warm box
+        const lines = instr.split("\n");
+        const runs = [];
+        lines.forEach((ln, k) => {
+          if (k) runs.push(new docx.TextRun({ text: "", size: 20, break: 1 }));
+          runs.push(new docx.TextRun({ text: ln, size: 20, color: "4b5563", font: "Georgia" }));
+        });
+        const box = { style: docx.BorderStyle.SINGLE, size: 4, color: "f6f4ef", space: 100 };
+        kids.push(new docx.Paragraph({ children: runs, shading: { fill: "f6f4ef" },
+          border: { top: box, bottom: box, left: box, right: box }, spacing: { after: 180, ...L } }));
+      }
     }
     [...body.children].forEach(ch => {
       if (ch.nodeType !== 1 || (ch.classList && ch.classList.contains("empty"))) return;
       blocksFromEl(ch).forEach(b => kids.push(b));
     });
-    const doc = new docx.Document({ sections: [{ children: kids, page: { margin: { top: 1440, bottom: 1440, left: 1440, right: 1440 } } }] });
+    // preview footer: thin rule, "Beepin Docx" left, page number right
+    const foot = new docx.Footer({ children: [new docx.Paragraph({
+      tabStops: [{ type: docx.TabStopType.RIGHT, position: 9026 }],
+      border: { top: { style: docx.BorderStyle.SINGLE, size: 4, color: "e5e0d4" } },
+      spacing: { before: 80, line: 240, lineRule: docx.LineRuleType.AUTO },
+      children: [
+        new docx.TextRun({ text: "Beepin Docx", font: "Poppins", size: 18, color: "9ca3af" }),
+        new docx.TextRun({ children: [new docx.Tab()], font: "Poppins", size: 18, color: "9ca3af" }),
+        new docx.TextRun({ text: "Page ", font: "Poppins", size: 18, color: "9ca3af" }),
+        new docx.TextRun({ children: [docx.PageNumber.CURRENT], font: "Poppins", size: 18, color: "9ca3af" })
+      ]
+    })] });
+    const doc = new docx.Document({ sections: [{ children: kids, page: { margin: { top: 1440, bottom: 1440, left: 1440, right: 1440 } }, footers: { default: foot } }] });
     const blob = await docx.Packer.toBlob(doc);
     saveAs(blob, "beepin-paper.docx");
     toast("Downloaded beepin-paper.docx");
