@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Beepin Docx — AI Paper to Word</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+<link rel="stylesheet" href="styles.css?v=4" />
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+</head>
+<body>
+
+<header class="topbar glass pop-in">
+  <div class="brand">
+    <img src="favicon.svg" alt="Beepin Docx" class="logo-img" />
+    <div><strong>Beepin Docx</strong><small>AI → Word papers</small></div>
+  </div>
+  <button id="themeToggle" class="icon-btn theme-toggle" aria-label="Switch theme" aria-pressed="false" title="Light / dark">
+    <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+    <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+  </button>
+  <div class="dd" id="ddTheme">
+    <button class="dd-btn icon-btn theme-more" aria-haspopup="listbox" aria-expanded="false" aria-label="More themes" title="More themes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="9" cy="10" r=".8" fill="currentColor"/><circle cx="13" cy="9" r=".8" fill="currentColor"/><circle cx="15.5" cy="12.5" r=".8" fill="currentColor"/><circle cx="10.5" cy="14.5" r=".8" fill="currentColor"/></svg></button>
+    <div class="dd-menu menu-right" role="listbox" aria-label="Theme" hidden></div>
+  </div>
+  <div class="top-actions">
+    <button id="btnAuthor" class="btn ghost" title="About the author">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></svg>
+      Author</button>
+    <button id="btnDocxTop" class="btn primary">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Word ↓</button>
+  </div>
+</header>
+
+<main class="layout">
+  <section class="panel glass pop-in d1">
+    <div class="tabs" role="tablist" aria-label="Input mode">
+      <button class="tab active" data-tab="paste" role="tab" aria-selected="true"><span class="wv"></span><span class="tab-in"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>Paste</span></button>
+      <button class="tab" data-tab="ai" role="tab" aria-selected="false"><span class="wv"></span><span class="tab-in"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.9 5.8L19.7 10l-5.8 1.9L12 17.7l-1.9-5.8L4.3 10l5.8-1.9z"/></svg>Generate</span></button>
+      <button class="tab" data-tab="style" role="tab" aria-selected="false"><span class="wv"></span><span class="tab-in"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>Style</span></button>
+    </div>
+
+    <div class="tabpage show" id="page-paste">
+      <textarea id="rawInput" spellcheck="false" placeholder="Paste messy AI paper here…"></textarea>
+      <div class="row">
+        <button id="btnClean" class="btn primary morph">Clean & Preview</button>
+        <button id="btnSample" class="btn ghost">Sample</button>
+        <button id="btnClearPaste" class="btn ghost">Clear</button>
+      </div>
+    </div>
+
+    <div class="tabpage" id="page-ai">
+      <button id="setToggle" class="exp-toggle" aria-expanded="false" aria-controls="setRegion">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Provider settings
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div id="setRegion" class="exp-body" hidden>
+        <div class="keycard" id="kc-gemini">
+          <div class="keycard-head"><strong>Gemini</strong><span class="kstatus" id="ks-gemini">No key</span></div>
+          <div class="keyrow">
+            <input type="password" id="key-gemini" placeholder="Gemini API key" autocomplete="off" spellcheck="false" />
+            <button class="tbtn" id="show-gemini" title="Show key" aria-label="Show Gemini key"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+            <button class="tbtn" id="clear-gemini" title="Clear key" aria-label="Clear Gemini key">✕</button>
+          </div>
+          <div class="row wrap">
+            <button class="btn ghost sm" id="save-gemini">Save</button>
+            <button class="btn ghost sm" id="disc-gemini">Discover</button>
+            <button class="btn ghost sm" id="test-gemini">Test</button>
+            <button class="btn ghost sm" id="cancel-gemini" hidden>Cancel</button>
+          </div>
+          <div class="status" id="st-gemini"></div>
+        </div>
+        <div class="keycard" id="kc-groq">
+          <div class="keycard-head"><strong>Groq</strong><span class="kstatus" id="ks-groq">No key</span></div>
+          <div class="keyrow">
+            <input type="password" id="key-groq" placeholder="Groq API key" autocomplete="off" spellcheck="false" />
+            <button class="tbtn" id="show-groq" title="Show key" aria-label="Show Groq key"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+            <button class="tbtn" id="clear-groq" title="Clear key" aria-label="Clear Groq key">✕</button>
+          </div>
+          <div class="row wrap">
+            <button class="btn ghost sm" id="save-groq">Save</button>
+            <button class="btn ghost sm" id="disc-groq">Discover</button>
+            <button class="btn ghost sm" id="test-groq">Test</button>
+            <button class="btn ghost sm" id="cancel-groq" hidden>Cancel</button>
+          </div>
+          <div class="status" id="st-groq"></div>
+        </div>
+        <div class="defrow"><span>Default first in Auto:</span>
+          <label class="radio"><input type="radio" name="defprov" value="gemini" checked /><span></span>Gemini</label>
+          <label class="radio"><input type="radio" name="defprov" value="groq" /><span></span>Groq</label>
+        </div>
+        <p class="hint">Auto may send your prompt to the other provider if the first fails — that uses extra quota. Manual provider choice never falls through. Declined answers are never retried elsewhere.</p>
+      </div>
+      <div class="ai-grid">
+        <div><label id="lblProvider">Provider</label><div class="dd" id="ddProvider">
+          <button class="dd-btn" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="lblProvider"><span class="dd-val">Auto</span><svg class="dd-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button>
+          <div class="dd-menu" role="listbox" aria-labelledby="lblProvider" hidden></div>
+        </div></div>
+        <div><label id="lblModel">Model</label><div class="dd" id="ddModel">
+          <button class="dd-btn" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="lblModel"><span class="dd-val">gemini-1.5-flash</span><svg class="dd-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button>
+          <div class="dd-menu" role="listbox" aria-labelledby="lblModel" hidden></div>
+        </div></div>
+      </div>
+      <div class="served" id="servedBy" hidden></div>
+      <div class="ai-grid">
+        <label>Subject<input id="fSubject" value="Mathematics" /></label>
+        <label>Class<input id="fClass" value="Class 10" /></label>
+        <label>Marks<input id="fMarks" value="50" /></label>
+        <label>Time<input id="fTime" value="2 hours" /></label>
+      </div>
+      <label>Topics<textarea id="fTopics" rows="2">Quadratic equations, Trigonometry, Probability</textarea></label>
+      <div class="photo-ai">
+        <button id="photoToggle" class="exp-toggle" aria-expanded="false" aria-controls="photoRegion">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          Photo to AI
+          <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div id="photoRegion" class="exp-body" hidden>
+        <div class="row">
+          <button id="btnCamera" class="btn ghost sm">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          Take photo</button>
+          <button id="btnUpload" class="btn ghost sm">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Upload</button>
+          <input type="file" id="fileImg" accept="image/*" hidden />
+        </div>
+        <div id="imgPrevWrap" class="img-prev" hidden><img id="imgPrev" alt="attached photo" /><button id="imgClear" class="mini-x" title="Remove photo" aria-label="Remove photo">✕</button></div>
+        <label>Ask about the photo<input id="imgQ" placeholder="e.g. Extract all questions as Markdown with $LaTeX$" /></label>
+        <button id="btnAskImg" class="btn primary morph wide">Ask AI about photo</button>
+        <div id="imgAns" class="img-ans" hidden></div>
+        </div>
+      </div>
+      <button id="btnGenerate" class="btn primary morph wide"><span id="genLabel">Generate with AI</span></button>
+      <div id="aiStatus" class="status"></div>
+    </div>
+
+    <div class="tabpage" id="page-style">
+      <label>School<input id="sSchool" value="Sunrise Public School" /></label>
+      <label>Exam title<input id="sTitle" value="Term Examination" /></label>
+      <label>Subject line<input id="sSub" value="Mathematics — Class 10" /></label>
+      <label>Meta<input id="sMeta" value="Time: 2 Hours  |  Max Marks: 50" /></label>
+      <label>Instructions<textarea id="sInstr" rows="2">1. All questions are compulsory. 2. Show all steps clearly.</textarea></label>
+      <div class="checks">
+        <label class="switch"><input type="checkbox" id="cHeader" checked /><span></span>Header</label>
+        <label class="switch"><input type="checkbox" id="cNativeMath" checked /><span></span>Native Word equations</label>
+      </div>
+      <p class="hint" id="mathNote">Full conversion: fractions, roots, scripts, ∑ ∫ lim, matrices, cases, align, accents — all native Word equations. PDF via print → Save as PDF.</p>
+    </div>
+  </section>
+
+  <section class="preview-wrap" id="previewWrap">
+    <div class="toolbar glass pop-in d2">
+      <div class="tb-group">
+        <button class="tbtn" id="zoomOut" aria-label="Zoom out" title="Zoom out">A−</button>
+        <span id="zoomLbl" title="Paper size">100%</span>
+        <button class="tbtn" id="zoomIn" aria-label="Zoom in" title="Zoom in">A+</button>
+        <button class="tbtn" id="btnFull" aria-label="Fullscreen preview" aria-pressed="false" title="Fullscreen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg></button>
+        <button class="tbtn" id="btnFocus" aria-label="Focus paper, hide sidebar" aria-pressed="false" title="Focus paper"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg></button>
+      </div>
+      <div class="tb-group fmt">
+        <button class="tbtn fmtB" data-cmd="bold" title="Bold" aria-label="Bold"><b>B</b></button>
+        <button class="tbtn fmtI" data-cmd="italic" title="Italic" aria-label="Italic"><i>I</i></button>
+        <button class="tbtn fmtU" data-cmd="underline" title="Underline" aria-label="Underline"><u>U</u></button>
+        <button class="tbtn" data-cmd="insertHorizontalRule" title="Horizontal line" aria-label="Insert horizontal line">―</button>
+        <button class="tbtn" data-cmd="removeFormat" title="Clear formatting" aria-label="Clear formatting">⌫</button>
+      </div>
+      <div class="tb-group">
+        <button class="btn ghost sm" id="btnClearPaper" title="Clear the paper preview">Clear</button>
+        <button class="btn ghost sm" id="btnPdf">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          PDF</button>
+        <button class="btn primary sm" id="btnDocx">.docx ↓</button>
+        <div class="dd" id="ddExport">
+          <button class="btn ghost sm" id="btnMore" aria-haspopup="menu" aria-expanded="false">More ↓</button>
+          <div class="dd-menu menu-right" role="menu" hidden>
+            <button class="menu-item" data-fmt="print" role="menuitem">Print</button>
+            <button class="menu-item" data-fmt="doc" role="menuitem">Word .doc</button>
+            <button class="menu-item" data-fmt="pptx" role="menuitem">PowerPoint .pptx</button>
+            <button class="menu-item" data-fmt="md" role="menuitem">Markdown .md</button>
+            <button class="menu-item" data-fmt="html" role="menuitem">Web page .html</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="paper-scroll">
+      <article class="a4" id="paper">
+        <div class="paper-head" id="paperHead">
+          <h1 id="pSchool">Sunrise Public School</h1>
+          <h2 id="pTitle">Term Examination</h2>
+          <div class="pmeta" id="pMeta"></div>
+          <div class="prule"></div>
+          <div class="pinstr" id="pInstr"></div>
+        </div>
+        <div class="paper-body" id="paperBody" contenteditable="true" spellcheck="false">
+          <div class="empty"><div class="empty-icon">✦</div><p>Paste AI text → Clean & Preview — then click here to edit</p></div>
+        </div>
+        <div class="paper-foot"><span id="pFootL">Beepin Docx</span><span>Page 1</span></div>
+      </article>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">Beepin Docx · by <a href="https://github.com/Bipin223" target="_blank" rel="noopener">Bipin Rizal</a> · <span id="statWords">0 words</span></footer>
+
+<div class="modal-back" id="authorModal">
+  <div class="modal glass pop-in">
+    <button class="modal-x icon-btn" id="authorClose" aria-label="Close">✕</button>
+    <div class="photo-wrap"><img src="author.jpg" alt="Bipin Rizal" class="author-photo" onerror="this.style.display='none';document.getElementById('authorFallback').style.display='grid'" /></div>
+    <div class="author-fallback" id="authorFallback">BR</div>
+    <h3>Bipin Rizal</h3>
+    <p>Author of Beepin Docx</p>
+    <a class="btn primary sm" href="https://github.com/Bipin223" target="_blank" rel="noopener">github.com/Bipin223</a>
+  </div>
+</div>
+
+<div class="modal-back" id="camModal">
+  <div class="modal glass pop-in wide-modal">
+    <button class="modal-x icon-btn" id="camClose" aria-label="Close">✕</button>
+    <h3>Snap a photo</h3>
+    <video id="camVideo" playsinline autoplay muted></video>
+    <div class="row center">
+      <button id="btnSnap" class="btn primary">Capture</button>
+      <button id="btnUploadAlt" class="btn ghost">Upload instead</button>
+    </div>
+    <p class="hint" id="camHint">Camera needs HTTPS or localhost — upload works everywhere.</p>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="app.js?v=4"></script>
+</body>
+</html>
