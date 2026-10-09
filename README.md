@@ -46,5 +46,5 @@ Every LaTeX construct becomes its proper Word form — verified against the `doc
 
 ## Photo → AI (new)
 - **Take photo** (in-app camera modal, needs HTTPS/localhost + permission) or **Upload** (works everywhere)
-- Photo is downscaled in-browser, then sent to Gemini (`gemini-1.5-flash` vision) or Groq (`meta-llama/llama-4-scout-17b-16e-instruct` vision) with your question
+- Photo is downscaled in-browser, then sent to Gemini with your question
 - Ask it to extract questions as Markdown + `$LaTeX$`, then **Send to editor** → Clean & Preview → export. Full chat-and-extract loop.
