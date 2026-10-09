@@ -418,9 +418,64 @@ function syncHeader() {
   $("#pMeta").textContent = `${$("#sSub").value}  •  ${$("#sMeta").value}`;
   $("#pInstr").textContent = $("#sInstr").value || "";
   $("#paperHead").style.display = $("#cHeader").checked ? "" : "none";
-  $("#pFootL").textContent = "Beepin Docx";
+  $("#pMeta").style.display = $("#cMeta").checked ? "" : "none";
+  $("#pInstr").style.display = $("#cInstrBox").checked ? "" : "none";
+  const footL = ($("#fFoot").value || "").trim(), showPg = $("#cPageNum").checked;
+  $("#pFootL").textContent = footL;
+  $("#pFootR").textContent = showPg ? "Page 1" : "";
+  $("#paperFoot").style.display = (!footL && !showPg) ? "none" : "";
+  try {
+    localStorage.setItem("bd_cfg", JSON.stringify({ m: $("#cMeta").checked, i: $("#cInstrBox").checked, p: showPg, f: $("#fFoot").value }));
+  } catch {}
 }
-["sSchool","sTitle","sSub","sMeta","sInstr","cHeader"].forEach(id => $("#"+id).addEventListener("input", syncHeader));
+["sSchool","sTitle","sSub","sMeta","sInstr","cHeader","cMeta","cInstrBox","fFoot","cPageNum"].forEach(id => $("#"+id).addEventListener("input", syncHeader));
+(function initHeadFoot() {
+  try {
+    const c = JSON.parse(localStorage.getItem("bd_cfg") || "{}");
+    if (c.m === false) document.getElementById("cMeta").checked = false;
+    if (c.i === false) document.getElementById("cInstrBox").checked = false;
+    if (c.p === false) document.getElementById("cPageNum").checked = false;
+    if (typeof c.f === "string") document.getElementById("fFoot").value = c.f;
+  } catch {}
+})();
+
+/* ---------- School logo for the header (preview + Word) ---------- */
+let schoolLogo = null, logoAspect = 1;
+try {
+  schoolLogo = localStorage.getItem("bd_logo") || null;
+  logoAspect = parseFloat(localStorage.getItem("bd_logo_ar")) || 1;
+} catch {}
+function syncLogo() {
+  const img = document.getElementById("pLogo");
+  if (img) { if (schoolLogo) { img.src = schoolLogo; img.hidden = false; } else img.hidden = true; }
+  const b = document.getElementById("btnLogoClear");
+  if (b) b.hidden = !schoolLogo;
+}
+$("#btnLogo").onclick = () => document.getElementById("fileLogo").click();
+$("#btnLogoClear").onclick = () => { schoolLogo = null; try { localStorage.removeItem("bd_logo"); localStorage.removeItem("bd_logo_ar"); } catch {} syncLogo(); };
+(function initLogoInput() {
+  const inp = document.getElementById("fileLogo");
+  if (!inp) return;
+  inp.addEventListener("change", e => {
+    const f = e.target.files[0]; e.target.value = "";
+    if (!f) return;
+    const url = URL.createObjectURL(f), img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const k = Math.min(1, 320 / Math.max(img.width, img.height));
+      const c = document.createElement("canvas");
+      c.width = Math.max(1, Math.round(img.width * k)); c.height = Math.max(1, Math.round(img.height * k));
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      logoAspect = c.width / c.height;
+      schoolLogo = c.toDataURL("image/jpeg", 0.85);
+      try { localStorage.setItem("bd_logo", schoolLogo); localStorage.setItem("bd_logo_ar", String(logoAspect)); } catch {}
+      syncLogo(); toast("Logo added to header");
+    };
+    img.onerror = () => toast("Couldn't read that image");
+    img.src = url;
+  });
+})();
+syncLogo();
 
 /* ---------- Preview ---------- */
 /* protect $…$ from Markdown (CommonMark turns \\ into \ and eats matrix rows) */
@@ -599,20 +654,14 @@ function makeDropdown(rootId, opts) {
   };
 }
 const GEMINI_MODELS = [{ value: "gemini-3.8-flash", label: "gemini-3.8-flash" }, { value: "gemini-2.5-flash", label: "gemini-2.5-flash" }, { value: "gemini-2.0-flash", label: "gemini-2.0-flash" }];
-const GROQ_MODELS = [{ value: "llama-3.3-70b-versatile", label: "llama-3.3-70b-versatile" }, { value: "llama-3.1-8b-instant", label: "llama-3.1-8b-instant" }];
 const PREF_MODELS = {
-  gemini: ["gemini-3.8-flash", "gemini-2.5-flash", "gemini-2.0-flash"],
-  groq: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]
+  gemini: ["gemini-3.8-flash", "gemini-2.5-flash", "gemini-2.0-flash"]
 };
-let aiProvider = "auto", aiModel = "gemini-3.8-flash";
-const discovered = { gemini: null, groq: null };   // short-lived in-memory catalogue
+let aiModel = "gemini-3.8-flash";
+const discovered = { gemini: null };   // short-lived in-memory catalogue
 const verified = JSON.parse(localStorage.getItem("bd_verified") || "{}");
 function saveVerified() { try { localStorage.setItem("bd_verified", JSON.stringify(verified)); } catch {} }
 const ddModel = makeDropdown("ddModel", { options: GEMINI_MODELS, value: aiModel, onChange: (v) => { aiModel = v; } });
-makeDropdown("ddProvider", {
-  options: [{ value: "auto", label: "Auto" }, { value: "gemini", label: "Gemini" }, { value: "groq", label: "Groq" }], value: aiProvider,
-  onChange: (v) => { aiProvider = v; }
-});
 
 /* ---------- document font: one picker drives preview + every export ---------- */
 const DOC_FONTS = {
@@ -693,10 +742,10 @@ makeDropdown("ddMargin", {
   inp.addEventListener("input", () => { marginCustom = parseFloat(inp.value); applyMargins(); });
 })();
 applyMargins();
-try { localStorage.removeItem("bd_key_gemini"); localStorage.removeItem("bd_key_groq"); } catch {}
+try { localStorage.removeItem("bd_key_gemini"); } catch {}
 
 /* ---------- one frontend entry: askAI({provider, model, messages, signal}) ---------- */
-async function askAI({ provider = "auto", model, messages, signal, timeout = 55000, maxTokens, vision } = {}) {
+async function askAI({ provider = "gemini", model, messages, signal, timeout = 55000, maxTokens, vision } = {}) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeout);
   if (signal) signal.addEventListener("abort", () => ctrl.abort(), { once: true });
@@ -726,19 +775,10 @@ $("#setToggle").addEventListener("click", () => {
   const btn = $("#setToggle"), reg = $("#setRegion");
   setExpanded(reg, btn, reg.hidden);
 });
-document.querySelectorAll('input[name="defprov"]').forEach(r => r.addEventListener("change", async () => {
-  try {
-    await fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ defaultProvider: r.value }) });
-    toast("Default provider: " + r.value);
-  } catch { toast("Could not save default"); }
-}));
 async function refreshStatus() {
   try {
     const j = await (await fetch("/api/status")).json();
     $("#ks-gemini").textContent = j.gemini ? "Key saved" : "No key";
-    $("#ks-groq").textContent = j.groq ? "Key saved" : "No key";
-    document.querySelectorAll('input[name="defprov"]').forEach(r => { r.checked = r.value === j.defaultProvider; });
   } catch {}
 }
 function keyCard(p) {
@@ -777,7 +817,7 @@ function keyCard(p) {
       if (j.error) { const e = new Error(j.error); e.code = j.code; throw e; }
       discovered[p] = j.models.map(m => m.id);
       st(`Found ${discovered[p].length} model${discovered[p].length === 1 ? "" : "s"}${j.cached ? " (cached)" : ""}.`, "ok");
-      if ((aiProvider === p) || (aiProvider === "auto" && p === "gemini")) {
+      if (p === "gemini") {
         ddModel.setOptions(discovered[p].map(id => ({ value: id, label: id })));
         if (discovered[p].length) { aiModel = discovered[p][0]; ddModel.setValue(aiModel); }
       }
@@ -820,13 +860,13 @@ function keyCard(p) {
       if (e.name === "AbortError") st("Cancelled.", "");
       else {
         const code = e.code ? ` [${e.code}]` : "";
-        st("Failed: " + e.message + code + " — you can try the other provider.", "err");
+        st("Failed: " + e.message + code, "err");
       }
     } finally { cancelBtn.hidden = true; cancelFn = null; }
   };
   $("#cancel-" + p).onclick = () => { if (cancelFn) cancelFn(); };
 }
-keyCard("gemini"); keyCard("groq"); refreshStatus();
+keyCard("gemini"); refreshStatus();
 function servedLine(j) {
   const el = $("#servedBy");
   el.hidden = false;
@@ -836,18 +876,29 @@ function servedLine(j) {
 function buildPrompt() {
   return `Create a school question paper in clean Markdown. Subject: ${$("#fSubject").value}, ${$("#fClass").value}. ` +
     `Topics: ${$("#fTopics").value}. Total ~${$("#fMarks").value} marks, Time ${$("#fTime").value}. ` +
-    `Rules: headings ## Section A/B, each question as "Q1. ... [N marks]". Math in $...$ / $$...$$ LaTeX. Tables in Markdown. Code in fences. End with Instructions blockquote. No preamble.`;
+    `Rules: headings ## Section A/B, each question as "Q1. ... [N marks]". Math in $...$ / $$...$$ LaTeX. Tables in Markdown. Code in fences. No title block, no preamble, no instructions section — start directly with the first section heading.`;
+}
+/* AI loves its own title page — drop everything before the first real block.
+   The app header already carries school/title/meta/instructions. */
+function structurePaper(md) {
+  const lines = String(md || "").replace(/\r\n/g, "\n").split("\n");
+  let start = 0, found = false;
+  for (let i = 0; i < Math.min(lines.length, 40); i++) {
+    if (/^(Q\d+\.|#{1,3}\s+(Section|Part)\b|\d{1,2}[.)]\s+[A-Z\u00c0-\u024f]|```|\||\s*[-*]\s+\S)/.test(lines[i].trim())) { start = i; found = true; break; }
+  }
+  const out = (found ? lines.slice(start) : lines).join("\n").replace(/^#\s+/gm, "## ");
+  return out.trim() || String(md || "").trim();
 }
 $("#btnGenerate").onclick = async () => {
   const st = $("#aiStatus");
-  $("#genLabel").textContent = "Generating…"; st.className = "status"; st.textContent = "Calling " + aiProvider + "…";
+  $("#genLabel").textContent = "Generating…"; st.className = "status"; st.textContent = "Calling Gemini…";
   try {
-    const j = await askAI({ provider: aiProvider, model: aiModel, messages: [
+    const j = await askAI({ provider: "gemini", model: aiModel, messages: [
       { role: "system", content: "You write clean Markdown exam papers with LaTeX math." },
       { role: "user", content: buildPrompt() }
     ], maxTokens: 8192, timeout: 120000 }); // thinking models need a big budget + time
     if (!j.text.trim()) throw new Error("Empty response — try again.");
-    $("#rawInput").value = j.text; syncCount(); render(); tabs[0].click();
+    $("#rawInput").value = structurePaper(j.text); syncCount(); render(); tabs[0].click();
     servedLine(j);
     st.className = "status ok"; st.textContent = "Done.";
   } catch (e) { st.className = "status err"; st.textContent = e.message + (e.code ? ` [${e.code}]` : ""); }
@@ -872,7 +923,7 @@ const SYM = {
   land:"∧",lor:"∨",oplus:"⊕",otimes:"⊗",odot:"⊙",
   to:"→",rightarrow:"→",leftarrow:"←",leftrightarrow:"↔",Rightarrow:"⇒",Leftarrow:"⇐",
   Leftrightarrow:"⇔",mapsto:"↦",uparrow:"↑",downarrow:"↓",infty2:"∞",
-  circ:"∘",degree:"°",prime:"′",ldots:"…",vdots:"⋮",ddots:"⋱",cdots:"⋯",
+  circ:"°",degree:"°",prime:"′",ldots:"…",vdots:"⋮",ddots:"⋱",cdots:"⋯",
   dots:"…",hellip:"…",partial:"∂",nabla:"∇",surd:"√",angle:"∠",perp:"⊥",
   parallel:"∥",mid:"∣",lvert:"|",rvert:"|",Vert:"‖",
   sum:"∑",prod:"∏",coprod:"∐",int:"∫",oint:"∮",iint:"∬",iiint:"∭",
@@ -933,7 +984,9 @@ function latexToMathKids(src) {
         const isSub = s[i] === "_"; i++;
         while (s[i] === " ") i++;
         let v;
-        if (s[i] === "{") v = readBrace(); else { v = s[i] || ""; i++; }
+        if (s[i] === "{") v = readBrace();
+        else if (s[i] === "\\") { const c = readCmd(); v = (c === null || c === " ") ? " " : "\\" + c; }
+        else { v = s[i] || ""; i++; }
         if (isSub) sub = v; else sup = v;
       } else break;
     }
@@ -1099,7 +1152,9 @@ function latexToMathKids(src) {
       const isSup = ch === "^"; i++;
       while (s[i] === " ") i++;
       let scr;
-      if (s[i] === "{") scr = readBrace(); else { scr = s[i] || ""; i++; }
+      if (s[i] === "{") scr = readBrace();
+      else if (s[i] === "\\") { const c = readCmd(); scr = (c === null || c === " ") ? " " : "\\" + c; }
+      else { scr = s[i] || ""; i++; }
       const scrKids = kidsOf(scr ?? "");
       if (buf) { const base = buf; buf = ""; flush(); kids.push(...attachScripts([MR(base)], base, isSup ? { sup: scr, sub: null } : { sub: scr, sup: null }) || [MR(base)]); }
       else {
@@ -1273,7 +1328,7 @@ function blocksFromEl(el, wrap = {}) {
 
   if (tag === "hr") return [new docx.Paragraph({ border: { bottom: { style: docx.BorderStyle.SINGLE, size: 12, color: "6b7280" } }, spacing: { before: 180, after: 180 } })];
   if (/^h[1-3]$/.test(tag)) {
-    const cfg = tag === "h1" ? { size: 52, center: true, lvl: docx.HeadingLevel.HEADING_1 }
+    const cfg = tag === "h1" ? { size: 52, center: true, color: "1f2937", lvl: docx.HeadingLevel.HEADING_1 }
       : tag === "h2" ? { size: 32, center: true, color: "4b5563", lvl: docx.HeadingLevel.HEADING_2 }
         : { size: 27, color: "4b5563", lvl: docx.HeadingLevel.HEADING_3 };
     return [new docx.Paragraph({
@@ -1391,13 +1446,21 @@ async function exportDocx() {
       const H = id => (((document.getElementById(id) || {}).textContent) || "").trim();
       const C = docx.AlignmentType.CENTER;
       const L = { line: 300, lineRule: docx.LineRuleType.AUTO };
+      if (schoolLogo) {
+        try {
+          const buf = await (await fetch(schoolLogo)).arrayBuffer();
+          const w = Math.max(20, Math.round(70 * (logoAspect || 1)));
+          kids.push(new docx.Paragraph({ alignment: C, spacing: { after: 60, ...L },
+            children: [new docx.ImageRun({ data: buf, transformation: { width: w, height: 70 } })] }));
+        } catch {}
+      }
       kids.push(new docx.Paragraph({ children: [new docx.TextRun({ text: H("pSchool") || $("#sSchool").value, bold: true, size: 52, font: docFonts().headWord })], alignment: C, spacing: { after: 80, ...L } }));      // preview h1: 26px
       kids.push(new docx.Paragraph({ children: [new docx.TextRun({ text: H("pTitle") || $("#sTitle").value, bold: true, size: 32, color: "4b5563", font: docFonts().headWord })], alignment: C, spacing: { after: 60, ...L } })); // preview h2: 16px
       const meta = (H("pMeta") || `${$("#sSub").value}  •  ${$("#sMeta").value}`).replace(/\s+/g, " ");
-      kids.push(new docx.Paragraph({ children: [new docx.TextRun({ text: meta, size: 20, color: "6b7280", font: docFonts().bodyWord })], alignment: C, spacing: { after: 0, ...L } })); // preview .pmeta: 13px
+      if ($("#cMeta").checked) kids.push(new docx.Paragraph({ children: [new docx.TextRun({ text: meta, size: 20, color: "6b7280", font: docFonts().bodyWord })], alignment: C, spacing: { after: 0, ...L } })); // preview .pmeta: 13px
       kids.push(new docx.Paragraph({ children: [new docx.TextRun({ text: "", size: 2 })], border: { bottom: { style: docx.BorderStyle.SINGLE, size: 6, color: "b9b3a5" } }, spacing: { before: 180, after: 180 } })); // preview .prule
       const instr = (H("pInstr") || $("#sInstr").value || "").replace(/\s+$/, "");
-      if (instr) { // preview .pinstr: 13px warm box
+      if ($("#cInstrBox").checked && instr) { // preview .pinstr: 13px warm box
         const lines = instr.split("\n");
         const runs = [];
         lines.forEach((ln, k) => {
@@ -1413,17 +1476,22 @@ async function exportDocx() {
       if (ch.nodeType !== 1 || (ch.classList && ch.classList.contains("empty"))) return;
       blocksFromEl(ch).forEach(b => kids.push(b));
     });
-    // preview footer: thin rule, "Beepin Docx" left, page number right
+    // preview footer: thin rule, custom left text, optional page number right
+    const footL = ($("#fFoot").value || "").trim(), showPg = $("#cPageNum").checked;
+    const HF = { font: docFonts().headWord, size: 18, color: "9ca3af" };
+    const footKids = [];
+    if (footL) footKids.push(new docx.TextRun({ text: footL, ...HF }));
+    if (footL && showPg) footKids.push(new docx.TextRun({ children: [new docx.Tab()], ...HF }));
+    if (showPg) {
+      footKids.push(new docx.TextRun({ text: "Page ", ...HF }));
+      footKids.push(new docx.TextRun({ children: [docx.PageNumber.CURRENT], ...HF }));
+    }
+    if (!footKids.length) footKids.push(new docx.TextRun({ text: "", size: 18 }));
     const foot = new docx.Footer({ children: [new docx.Paragraph({
       tabStops: [{ type: docx.TabStopType.RIGHT, position: tabPosTwips() }],
       border: { top: { style: docx.BorderStyle.SINGLE, size: 4, color: "e5e0d4" } },
       spacing: { before: 80, line: 240, lineRule: docx.LineRuleType.AUTO },
-      children: [
-        new docx.TextRun({ text: "Beepin Docx", font: docFonts().headWord, size: 18, color: "9ca3af" }),
-        new docx.TextRun({ children: [new docx.Tab()], font: docFonts().headWord, size: 18, color: "9ca3af" }),
-        new docx.TextRun({ text: "Page ", font: docFonts().headWord, size: 18, color: "9ca3af" }),
-        new docx.TextRun({ children: [docx.PageNumber.CURRENT], font: docFonts().headWord, size: 18, color: "9ca3af" })
-      ]
+      children: footKids
     })] });
     const M = marginTwips(); // preview padding and Word margins are the same inches
     const doc = new docx.Document({ sections: [{ children: kids, properties: { page: { margin: { top: M, bottom: M, left: M, right: M } } }, footers: { default: foot } }] });
@@ -1655,8 +1723,8 @@ $("#btnAskImg").onclick = async () => {
   box.innerHTML = "<p class='status'>Reading photo…</p>";
   setExpanded(box, null, true);
   try {
-    const j = await askAI({ provider: aiProvider,
-      model: aiProvider === "groq" ? "meta-llama/llama-4-scout-17b-16e-instruct" : aiModel,
+    const j = await askAI({ provider: "gemini",
+      model: aiModel,
       messages: [
         { role: "system", content: "Extract text faithfully. Return math in $...$ / $$...$$ LaTeX." },
         { role: "user", content: q, image: attachedImage }

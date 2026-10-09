@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
-<link rel="stylesheet" href="styles.css?v=24" />
+<link rel="stylesheet" href="styles.css?v=26" />
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
@@ -84,32 +84,8 @@
           </div>
           <div class="status" id="st-gemini"></div>
         </div>
-        <div class="keycard" id="kc-groq">
-          <div class="keycard-head"><strong>Groq</strong><span class="kstatus" id="ks-groq">No key</span></div>
-          <div class="keyrow">
-            <input type="password" id="key-groq" placeholder="Groq API key" autocomplete="off" spellcheck="false" />
-            <button class="tbtn" id="show-groq" title="Show key" aria-label="Show Groq key"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
-            <button class="tbtn" id="clear-groq" title="Clear key" aria-label="Clear Groq key">✕</button>
-          </div>
-          <div class="row wrap">
-            <button class="btn ghost sm" id="save-groq">Save</button>
-            <button class="btn ghost sm" id="disc-groq">Discover</button>
-            <button class="btn ghost sm" id="test-groq">Test</button>
-            <button class="btn ghost sm" id="cancel-groq" hidden>Cancel</button>
-          </div>
-          <div class="status" id="st-groq"></div>
-        </div>
-        <div class="defrow"><span>Default first in Auto:</span>
-          <label class="radio"><input type="radio" name="defprov" value="gemini" checked /><span></span>Gemini</label>
-          <label class="radio"><input type="radio" name="defprov" value="groq" /><span></span>Groq</label>
-        </div>
-        <p class="hint">Auto may send your prompt to the other provider if the first fails — that uses extra quota. Manual provider choice never falls through. Declined answers are never retried elsewhere.</p>
       </div>
       <div class="ai-grid">
-        <div><label id="lblProvider">Provider</label><div class="dd" id="ddProvider">
-          <button class="dd-btn" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="lblProvider"><span class="dd-val">Auto</span><svg class="dd-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button>
-          <div class="dd-menu" role="listbox" aria-labelledby="lblProvider" hidden></div>
-        </div></div>
         <div><label id="lblModel">Model</label><div class="dd" id="ddModel">
           <button class="dd-btn" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="lblModel"><span class="dd-val">gemini-3.8-flash</span><svg class="dd-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button>
           <div class="dd-menu" role="listbox" aria-labelledby="lblModel" hidden></div>
@@ -155,6 +131,19 @@
       <label>Subject line<input id="sSub" value="Mathematics — Class 10" /></label>
       <label>Meta<input id="sMeta" value="Time: 2 Hours  |  Max Marks: 50" /></label>
       <label>Instructions<textarea id="sInstr" rows="2">1. All questions are compulsory. 2. Show all steps clearly.</textarea></label>
+      <div class="row wrap">
+        <button id="btnLogo" class="btn ghost sm" title="Add your school logo to the header">School logo ↑</button>
+        <button id="btnLogoClear" class="btn ghost sm" hidden>Remove logo</button>
+      </div>
+      <input type="file" id="fileLogo" accept="image/*" hidden />
+      <div class="checks">
+        <label class="switch"><input type="checkbox" id="cMeta" checked /><span></span>Details line</label>
+        <label class="switch"><input type="checkbox" id="cInstrBox" checked /><span></span>Instructions box</label>
+      </div>
+      <label>Footer left<input id="fFoot" value="Beepin Docx" /></label>
+      <div class="checks">
+        <label class="switch"><input type="checkbox" id="cPageNum" checked /><span></span>Page number</label>
+      </div>
       <div><label id="lblFont">Document font</label><div class="dd" id="ddFont">
         <button class="dd-btn" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="lblFont"><span class="dd-val">Georgia + Poppins</span><svg class="dd-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button>
         <div class="dd-menu" role="listbox" aria-labelledby="lblFont" hidden></div>
@@ -209,6 +198,7 @@
     <div class="paper-scroll">
       <article class="a4" id="paper">
         <div class="paper-head" id="paperHead">
+          <img id="pLogo" alt="School logo" hidden />
           <h1 id="pSchool">Sunrise Public School</h1>
           <h2 id="pTitle">Term Examination</h2>
           <div class="pmeta" id="pMeta"></div>
@@ -218,7 +208,7 @@
         <div class="paper-body" id="paperBody" contenteditable="true" spellcheck="false">
           <div class="empty"><div class="empty-icon">✦</div><p>Paste AI text → Clean & Preview — then click here to edit</p></div>
         </div>
-        <div class="paper-foot"><span id="pFootL">Beepin Docx</span><span>Page 1</span></div>
+        <div class="paper-foot" id="paperFoot"><span id="pFootL">Beepin Docx</span><span id="pFootR">Page 1</span></div>
       </article>
     </div>
   </section>
@@ -251,6 +241,6 @@
 </div>
 
 <div class="toast" id="toast"></div>
-<script src="app.js?v=24"></script>
+<script src="app.js?v=26"></script>
 </body>
 </html>

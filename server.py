@@ -5,10 +5,9 @@ Serves the static app and proxies AI requests so API keys never touch
 the browser, logs, or error messages.
 
 Endpoints:
-  GET  /api/status            -> {gemini:bool, groq:bool, defaultProvider}
+  GET  /api/status            -> {gemini:bool}
   POST /api/keys   {provider, key} -> {ok:true}            (memory only)
   DELETE /api/keys?provider=x -> {ok:true}
-  POST /api/settings {defaultProvider} -> {ok:true}
   POST /api/models  {provider} -> {models:[{id}], cached:bool}
   POST /api/ai {provider, model?, messages, maxTokens?, vision?}
        -> {text, provider, model} | {error, code}
@@ -25,12 +24,11 @@ BASE = __file__.rsplit("/", 1)[0].rsplit("\\", 1)[0] or "."
 KEYS = {}            # provider -> key; memory only, never persisted
 MODELS_CACHE = {}    # provider -> (timestamp, [ids]); TTL below
 CACHE_TTL = 300
-SETTINGS = {"defaultProvider": "gemini"}
-LAST_GOOD = {}       # provider -> last model that actually succeeded
-# models Google/Groq themselves point at when an older id 404s for a key
-RECOMMENDED = {"gemini": "gemini-3.8-flash", "groq": "llama-3.3-70b-versatile"}
-FALLBACK_MODELS = {"gemini": RECOMMENDED["gemini"], "groq": RECOMMENDED["groq"]}
-VISION_MODELS = {"gemini": RECOMMENDED["gemini"], "groq": "meta-llama/llama-4-scout-17b-16e-instruct"}
+LAST_GOOD = {}       # last model that actually succeeded
+# model Google itself points at when an older id 404s for a key
+RECOMMENDED_MODEL = "gemini-3.8-flash"
+FALLBACK_MODEL = RECOMMENDED_MODEL
+VISION_MODEL = RECOMMENDED_MODEL
 UPSTREAM_TIMEOUT = 110
 DISCOVERY_TIMEOUT = 20
 
@@ -121,33 +119,6 @@ def gemini_text(resp):
     return None, {"error": f"Gemini returned no text ({det})", "code": "BAD_RESPONSE"}
 
 
-def groq_payload(messages, max_tokens):
-    out = []
-    for m in messages:
-        role = m.get("role", "user")
-        if role not in ("system", "user", "assistant"):
-            role = "user"
-        if m.get("image"):
-            out.append({"role": role, "content": [
-                {"type": "text", "text": m.get("content", "")},
-                {"type": "image_url", "image_url": {"url": m["image"]}},
-            ]})
-        else:
-            out.append({"role": role, "content": m.get("content", "")})
-    return {"model": None, "messages": out, "temperature": 0.7, "max_tokens": max_tokens or 4096}
-
-
-def groq_text(resp):
-    try:
-        choice = (resp.get("choices") or [{}])[0] or {}
-        text = (choice.get("message") or {}).get("content") or ""
-    except Exception:
-        text = ""
-    if not text:
-        return None, {"error": "Groq returned no text", "code": "BAD_RESPONSE"}
-    return text, None
-
-
 def dead_model(err):
     """A model id this key can no longer call (retired / gated / renamed)."""
     if not isinstance(err, dict):
@@ -158,58 +129,38 @@ def dead_model(err):
                            "has been retired", "is not found", "does not have a handler"))
 
 
-def call_provider(provider, model, messages, max_tokens):
-    key = KEYS.get(provider)
+def call_provider(model, messages, max_tokens):
+    key = KEYS.get("gemini")
     if not key:
-        return None, {"error": f"No {provider} key saved", "code": "NO_KEY", "status": None}
+        return None, {"error": "No gemini key saved", "code": "NO_KEY", "status": None}
     model = (model or "").replace("models/", "").strip()
     try:
-        if provider == "gemini":
-            _, resp = upost(
-                f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}",
-                gemini_payload(messages, max_tokens), {}, UPSTREAM_TIMEOUT)
-            return gemini_text(resp)
-        if provider == "groq":
-            payload = groq_payload(messages, max_tokens)
-            payload["model"] = model
-            _, resp = upost("https://api.groq.com/openai/v1/chat/completions", payload,
-                            {"Authorization": "Bearer " + key}, UPSTREAM_TIMEOUT)
-            return groq_text(resp)
+        _, resp = upost(
+            f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}",
+            gemini_payload(messages, max_tokens), {}, UPSTREAM_TIMEOUT)
+        return gemini_text(resp)
     except Exception as exc:  # noqa: BLE001 - normalized below
-        return None, upstream_error(provider, exc)
-    return None, {"error": f"Unknown provider {provider}", "code": "BAD_REQUEST", "status": None}
+        return None, upstream_error("gemini", exc)
 
 
-def discover(provider):
+def discover():
     now = time.time()
-    if provider in MODELS_CACHE and now - MODELS_CACHE[provider][0] < CACHE_TTL:
-        return MODELS_CACHE[provider][1], True
-    key = KEYS.get(provider)
+    if "gemini" in MODELS_CACHE and now - MODELS_CACHE["gemini"][0] < CACHE_TTL:
+        return MODELS_CACHE["gemini"][1], True
+    key = KEYS.get("gemini")
     if not key:
-        return None, {"error": f"No {provider} key saved", "code": "NO_KEY"}
+        return None, {"error": "No gemini key saved", "code": "NO_KEY"}
     try:
-        if provider == "gemini":
-            _, resp = uget(f"https://generativelanguage.googleapis.com/v1beta/models?key={key}",
-                           {}, DISCOVERY_TIMEOUT)
-            ids = []
-            for m in resp.get("models", []):
-                methods = m.get("supportedGenerationMethods", [])
-                if "generateContent" in methods:
-                    ids.append(m.get("name", "").replace("models/", ""))
-        elif provider == "groq":
-            _, resp = uget("https://api.groq.com/openai/v1/models",
-                           {"Authorization": "Bearer " + key}, DISCOVERY_TIMEOUT)
-            ids = [m.get("id") for m in resp.get("data", []) if m.get("id")]
-        else:
-            return None, {"error": f"Unknown provider {provider}", "code": "BAD_REQUEST"}
+        _, resp = uget("https://generativelanguage.googleapis.com/v1beta/models?key=" + key,
+                       {}, DISCOVERY_TIMEOUT)
+        ids = []
+        for m in resp.get("models", []):
+            if "generateContent" in (m.get("supportedGenerationMethods", [])):
+                ids.append(m.get("name", "").replace("models/", ""))
     except Exception as exc:  # noqa: BLE001
-        return None, upstream_error(provider, exc)
-    MODELS_CACHE[provider] = (now, ids)
+        return None, upstream_error("gemini", exc)
+    MODELS_CACHE["gemini"] = (now, ids)
     return ids, False
-
-
-RETRYABLE = {"TIMEOUT", "NETWORK", "NO_KEY", "UPSTREAM_400", "UPSTREAM_401", "UPSTREAM_404",
-             "UPSTREAM_429", "UPSTREAM_500", "UPSTREAM_502", "UPSTREAM_503", "UPSTREAM_504"}
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -228,9 +179,7 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/api/status":
-            return jsend(self, 200, {"gemini": bool(KEYS.get("gemini")),
-                                    "groq": bool(KEYS.get("groq")),
-                                    "defaultProvider": SETTINGS["defaultProvider"]})
+            return jsend(self, 200, {"gemini": bool(KEYS.get("gemini"))})
         return super().do_GET()
 
     def do_DELETE(self):
@@ -247,22 +196,18 @@ class Handler(SimpleHTTPRequestHandler):
         body = self._json()
         if self.path == "/api/keys":
             p, key = body.get("provider"), (body.get("key") or "").strip()
-            if p not in ("gemini", "groq") or not key:
+            if p != "gemini" or not key:
                 return jsend(self, 400, {"error": "provider and key required", "code": "BAD_REQUEST"})
             KEYS[p] = key
             MODELS_CACHE.pop(p, None)
             return jsend(self, 200, {"ok": True})
         if self.path == "/api/settings":
-            d = body.get("defaultProvider")
-            if d in ("gemini", "groq"):
-                SETTINGS["defaultProvider"] = d
-                return jsend(self, 200, {"ok": True})
-            return jsend(self, 400, {"error": "defaultProvider must be gemini|groq", "code": "BAD_REQUEST"})
+            return jsend(self, 200, {"ok": True})  # kept for compat; single provider now
         if self.path == "/api/models":
-            p = body.get("provider")
-            if p not in ("gemini", "groq"):
-                return jsend(self, 400, {"error": "provider must be gemini|groq", "code": "BAD_REQUEST"})
-            ids, extra = discover(p)
+            p = body.get("provider", "gemini")
+            if p not in ("gemini", "auto"):
+                return jsend(self, 400, {"error": "provider must be gemini", "code": "BAD_REQUEST"})
+            ids, extra = discover()
             if isinstance(extra, dict):  # error
                 return jsend(self, 200, extra)
             return jsend(self, 200, {"models": [{"id": i} for i in ids], "cached": bool(extra)})
@@ -271,41 +216,27 @@ class Handler(SimpleHTTPRequestHandler):
         return jsend(self, 404, {"error": "not found", "code": "NOT_FOUND"})
 
     def _ai(self, body):
-        provider = body.get("provider", "auto")
+        provider = body.get("provider", "gemini")
+        if provider not in ("gemini", "auto"):
+            return jsend(self, 400, {"error": "provider must be gemini", "code": "BAD_REQUEST"})
         model = body.get("model")
         messages = body.get("messages") or []
         max_tokens = body.get("maxTokens")
         vision = bool(body.get("vision"))
         if not isinstance(messages, list) or not messages:
             return jsend(self, 400, {"error": "messages required", "code": "BAD_REQUEST"})
-        if provider == "auto":
-            first = SETTINGS["defaultProvider"]
-            order = [first, "groq" if first == "gemini" else "gemini"]
-        elif provider in ("gemini", "groq"):
-            order = [provider]
-        else:
-            return jsend(self, 400, {"error": "provider must be auto|gemini|groq", "code": "BAD_REQUEST"})
-        last_err, tried = {"error": "no provider configured", "code": "NO_KEY"}, 0
-        for p in order:
-            if tried >= 2:  # bounded: at most 2 attempts
-                break
-            m = model or LAST_GOOD.get(p) or (VISION_MODELS if vision else FALLBACK_MODELS)[p]
-            asked = m
-            text, err = call_provider(p, m, messages, max_tokens)
-            if text is None and m != RECOMMENDED.get(p) and dead_model(err):
-                # the chosen id is retired for this key → swap in the current model,
-                # same provider, still counts as one attempt
-                m = RECOMMENDED[p]
-                text, err = call_provider(p, m, messages, max_tokens)
-            if text is not None:
-                LAST_GOOD[p] = m
-                return jsend(self, 200, {"text": text, "provider": p, "model": m,
-                                         "requested": asked, "switched": m != asked})
-            last_err = err
-            tried += 1
-            if provider != "auto" or err.get("code") not in RETRYABLE:
-                break  # manual mode, refusals and bad requests never fall through
-        return jsend(self, 200, last_err)
+        m = model or LAST_GOOD.get("gemini") or (VISION_MODEL if vision else FALLBACK_MODEL)
+        asked = m
+        text, err = call_provider(m, messages, max_tokens)
+        if text is None and m != RECOMMENDED_MODEL and dead_model(err):
+            # the chosen id is retired for this key → swap in the current model, one retry
+            m = RECOMMENDED_MODEL
+            text, err = call_provider(m, messages, max_tokens)
+        if text is not None:
+            LAST_GOOD["gemini"] = m
+            return jsend(self, 200, {"text": text, "provider": "gemini", "model": m,
+                                     "requested": asked, "switched": m != asked})
+        return jsend(self, 200, err)
 
 
 if __name__ == "__main__":

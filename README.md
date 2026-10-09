@@ -2,7 +2,7 @@
 
 **Design:** warm minimalist caffeine theme — borderless tonal surfaces, Poppins, Lucide outline icons, gradient separators. Light/dark toggle uses a circular View-Transitions reveal; tabs use center-out underlines + hover wave; provider/model are custom tonal dropdowns with glass menus; Photo-to-AI is an expandable section.
 
-Paste messy output from Gemini / ChatGPT / Groq → clean **A4 preview** → **proper .docx with native editable Word equations** + **PDF**.
+Paste messy output from Gemini / ChatGPT → clean **A4 preview** → **proper .docx with native editable Word equations** + **PDF**.
 
 Author: **Bipin Rizal** — https://github.com/Bipin223
 
@@ -11,9 +11,9 @@ Author: **Bipin Rizal** — https://github.com/Bipin223
 
 ## AI architecture
 - `askAI({provider, model, messages, signal})` is the single frontend entry → `POST /api/ai`
-- `POST /api/models` discovers key-available models (5-min server cache); verification tests exactly one candidate with a 25s cancellable probe — model names are never trusted blindly
-- Provider settings: separate masked key inputs (explicit show/clear clicks), Discover, Test/Cancel, default-provider radio, manual chat-model selector
-- Auto mode tries default-then-other (max 2 attempts), shows "Answered by X · model", warns about cross-provider quota; manual choice never falls through; refusals are never retried elsewhere
+- `POST /api/models` discovers key-available models (5-min server cache); verification tests exactly one candidate with a cancellable probe — model names are never trusted blindly
+- Provider settings: masked key input (explicit show/clear clicks), Discover, Test/Cancel, manual chat-model selector
+- Answers show "Answered by Gemini · model"; refusals are never retried; retired model ids auto-swap to the current one
 - Success normalizes to `{text, provider, model}`; errors to `{error, code}` with credentials scrubbed
 
 ## Author photo
