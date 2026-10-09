@@ -9,11 +9,12 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
-<link rel="stylesheet" href="styles.css?v=5" />
+<link rel="stylesheet" href="styles.css?v=11" />
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
 </head>
@@ -54,9 +55,11 @@
       <textarea id="rawInput" spellcheck="false" placeholder="Paste messy AI paper here…"></textarea>
       <div class="row">
         <button id="btnClean" class="btn primary morph">Clean & Preview</button>
+        <button id="btnImport" class="btn ghost" title="Open an existing Word file, keep its equations, and clean it">.docx ↑</button>
         <button id="btnSample" class="btn ghost">Sample</button>
         <button id="btnClearPaste" class="btn ghost">Clear</button>
       </div>
+      <input type="file" id="fileDocx" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden />
     </div>
 
     <div class="tabpage" id="page-ai">
@@ -108,7 +111,7 @@
           <div class="dd-menu" role="listbox" aria-labelledby="lblProvider" hidden></div>
         </div></div>
         <div><label id="lblModel">Model</label><div class="dd" id="ddModel">
-          <button class="dd-btn" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="lblModel"><span class="dd-val">gemini-1.5-flash</span><svg class="dd-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button>
+          <button class="dd-btn" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="lblModel"><span class="dd-val">gemini-3.8-flash</span><svg class="dd-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button>
           <div class="dd-menu" role="listbox" aria-labelledby="lblModel" hidden></div>
         </div></div>
       </div>
@@ -239,6 +242,6 @@
 </div>
 
 <div class="toast" id="toast"></div>
-<script src="app.js?v=5"></script>
+<script src="app.js?v=11"></script>
 </body>
 </html>

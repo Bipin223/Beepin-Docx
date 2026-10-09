@@ -27,8 +27,10 @@ MODELS_CACHE = {}    # provider -> (timestamp, [ids]); TTL below
 CACHE_TTL = 300
 SETTINGS = {"defaultProvider": "gemini"}
 LAST_GOOD = {}       # provider -> last model that actually succeeded
-FALLBACK_MODELS = {"gemini": "gemini-1.5-flash", "groq": "llama-3.3-70b-versatile"}
-VISION_MODELS = {"gemini": "gemini-1.5-flash", "groq": "meta-llama/llama-4-scout-17b-16e-instruct"}
+# models Google/Groq themselves point at when an older id 404s for a key
+RECOMMENDED = {"gemini": "gemini-3.8-flash", "groq": "llama-3.3-70b-versatile"}
+FALLBACK_MODELS = {"gemini": RECOMMENDED["gemini"], "groq": RECOMMENDED["groq"]}
+VISION_MODELS = {"gemini": RECOMMENDED["gemini"], "groq": "meta-llama/llama-4-scout-17b-16e-instruct"}
 UPSTREAM_TIMEOUT = 50
 DISCOVERY_TIMEOUT = 20
 
@@ -135,10 +137,21 @@ def groq_text(resp):
     return text, None
 
 
+def dead_model(err):
+    """A model id this key can no longer call (retired / gated / renamed)."""
+    if not isinstance(err, dict):
+        return False
+    msg = str(err.get("error", "")).lower()
+    return err.get("code") == "UPSTREAM_404" or any(
+        s in msg for s in ("no longer available", "not found", "not supported",
+                           "has been retired", "is not found", "does not have a handler"))
+
+
 def call_provider(provider, model, messages, max_tokens):
     key = KEYS.get(provider)
     if not key:
         return None, {"error": f"No {provider} key saved", "code": "NO_KEY", "status": None}
+    model = (model or "").replace("models/", "").strip()
     try:
         if provider == "gemini":
             _, resp = upost(
@@ -266,10 +279,17 @@ class Handler(SimpleHTTPRequestHandler):
             if tried >= 2:  # bounded: at most 2 attempts
                 break
             m = model or LAST_GOOD.get(p) or (VISION_MODELS if vision else FALLBACK_MODELS)[p]
+            asked = m
             text, err = call_provider(p, m, messages, max_tokens)
+            if text is None and m != RECOMMENDED.get(p) and dead_model(err):
+                # the chosen id is retired for this key → swap in the current model,
+                # same provider, still counts as one attempt
+                m = RECOMMENDED[p]
+                text, err = call_provider(p, m, messages, max_tokens)
             if text is not None:
                 LAST_GOOD[p] = m
-                return jsend(self, 200, {"text": text, "provider": p, "model": m})
+                return jsend(self, 200, {"text": text, "provider": p, "model": m,
+                                         "requested": asked, "switched": m != asked})
             last_err = err
             tried += 1
             if provider != "auto" or err.get("code") not in RETRYABLE:

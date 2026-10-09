@@ -112,6 +112,223 @@ $("#btnSample").onclick = () => { $("#rawInput").value = SAMPLE; syncCount(); re
 const EMPTY_PAPER = '<div class="empty"><div class="empty-icon">✦</div><p>Paste AI text → Clean & Preview — then click here to edit</p></div>';
 $("#btnClearPaste").onclick = () => { $("#rawInput").value = ""; syncCount(); toast("Paste cleared"); };
 $("#btnClearPaper").onclick = () => { $("#paperBody").innerHTML = EMPTY_PAPER; toast("Paper cleared"); };
+
+/* ---------- Import .docx → clean Markdown (unzipped in the browser) ---------- */
+const wLN = el => el.localName || String(el.tagName || "").split(":").pop();
+const wEls = el => [...el.childNodes].filter(n => n.nodeType === 1);
+const wChild = (el, name) => wEls(el).find(k => wLN(k) === name);
+const wKids = (el, name) => wEls(el).filter(k => wLN(k) === name);
+const wVal = el => { if (!el) return ""; for (const a of (el.attributes || [])) if (a.name.split(":").pop() === "val") return a.value; return ""; };
+
+function mathPlain(el) { // leaf math text → LaTeX-safe; math-alphanumerics folded, accents kept
+  let s = "";
+  const walk = n => {
+    if (n.nodeType === 3) { s += n.textContent; return; }
+    if (n.nodeType !== 1) return;
+    const l = wLN(n);
+    if (l === "t") s += n.textContent;
+    else if (l === "tab" || l === "br") s += " ";
+    else [...n.childNodes].forEach(walk);
+  };
+  walk(el);
+  let folded = "";
+  for (const ch of s) { // only fold Unicode math letters (𝑥, 𝑎 …); keep real accents
+    const cp = ch.codePointAt(0);
+    const isMathAlnum = (cp >= 0x1D400 && cp <= 0x1D7FF) || (cp >= 0x2100 && cp <= 0x214F);
+    folded += isMathAlnum ? ch.normalize("NFKD").replace(/[\u0300-\u036f]/g, "") : ch;
+  }
+  return folded.replace(/([&%#])/g, "\\$1").replace(/([_^])/g, "\\$1");
+}
+const COMB_FN = { "̂": "\\hat", "̃": "\\tilde", "̄": "\\bar", "̅": "\\bar",
+  "̇": "\\dot", "̈": "\\ddot", "̄̄": "\\bar", "́": "\\acute", "̀": "\\grave",
+  "̲": "\\underline", "̳": "\\underline", "̸": "\\not", "⃗": "\\vec", "⃖": "\\overleftarrow" };
+function polishMath(s) {
+  return s
+    .replace(/\b(sin|cos|tan|cot|sec|csc|sinh|cosh|tanh|arcsin|arccos|arctan|log|ln|lg|lim|det|max|min|exp|gcd|deg)\b/g, "\\$1")
+    .replace(/×/g, "\\times ").replace(/÷/g, "\\div ").replace(/≤/g, "\\le ").replace(/≥/g, "\\ge ")
+    .replace(/≠/g, "\\ne ").replace(/→/g, "\\to ").replace(/−/g, "-").replace(/∞/g, "\\infty ")
+    .replace(/·/g, "\\cdot ")
+    .replace(/([^\s\\{}])([\u0300-\u036f\u20d7\u20d6\u20d3\u0338])/g, (m, base, mk) => // x̂ → \hat{x}
+      (COMB_FN[mk] ? `${COMB_FN[mk]}{${base}}` : base + mk))
+    .replace(/\s+/g, " ").trim();
+}
+function ommlToLatex(node) { // native Word equations → LaTeX
+  const kidsEl = wEls(node);
+  if (!kidsEl.length) return mathPlain(node);
+  const V = n => (n ? ommlToLatex(n) : "");
+  let out = "";
+  for (const el of kidsEl) {
+    const l = wLN(el);
+    if (l === "r" || l === "t") out += mathPlain(el);
+    else if (l === "f") out += `\\frac{${V(wChild(el, "num"))}}{${V(wChild(el, "den"))}}`;
+    else if (l === "sSup") out += `{${V(wChild(el, "e"))}}^{${V(wChild(el, "sup"))}}`;
+    else if (l === "sSub") out += `{${V(wChild(el, "e"))}}_{${V(wChild(el, "sub"))}}`;
+    else if (l === "sSubSup") out += `{${V(wChild(el, "e"))}}_{${V(wChild(el, "sub"))}}^{${V(wChild(el, "sup"))}}`;
+    else if (l === "rad") {
+      const d = V(wChild(el, "deg")).trim();
+      out += d ? `\\sqrt[${d}]{${V(wChild(el, "e"))}}` : `\\sqrt{${V(wChild(el, "e"))}}`;
+    } else if (l === "nary") {
+      const pr = wChild(el, "naryPr"), chrEl = pr && wChild(pr, "chr");
+      const chr = (chrEl && wVal(chrEl)) || "∫";
+      const sym = ({ "∫": "\\int", "∑": "\\sum", "∏": "\\prod", "∬": "\\iint", "∯": "\\oiint",
+        "⋀": "\\bigwedge", "⋁": "\\bigvee" })[chr] || chr;
+      const sub = V(wChild(el, "sub")).trim(), sup = V(wChild(el, "sup")).trim();
+      out += (sub || sup ? sym + (sub ? `_{${sub}}` : "") + (sup ? `^{${sup}}` : "") : sym)
+        + `{${V(wChild(el, "e"))}}`;
+    } else if (l === "d") {
+      const pr = wChild(el, "dPr");
+      const norm = v => (!v || v === "null" || !String(v).trim()) ? "" : v;
+      const beg = norm(pr && wChild(pr, "begChr") ? wVal(wChild(pr, "begChr")) : "(");
+      const end = norm(pr && wChild(pr, "endChr") ? wVal(wChild(pr, "endChr")) : ")");
+      const es = wKids(el, "e");
+      const arr = es.length === 1 && wChild(es[0], "eqArray");
+      if (arr && (beg === "{" || beg === "")) { // Word's cases block
+        const rows = wKids(arr, "e").map(V).join(" \\\\ ");
+        out += `\\begin{cases}${rows}\\end{cases}`;
+        continue;
+      }
+      const body = es.map(V).join("");
+      out += (beg || end) ? `\\left${beg}${body}\\right${end}` : body;
+    } else if (l === "func") out += `${V(wChild(el, "fName"))}\\left(${V(wChild(el, "e"))}\\right)`;
+    else if (l === "bar") {
+      const pos = wVal(wChild(wChild(el, "barPr"), "barPos"));
+      out += (pos === "bot" ? "\\underline{" : "\\overline{") + V(wChild(el, "e")) + "}";
+    } else if (l === "acc" || l === "groupChr") {
+      const pr = wChild(el, l === "acc" ? "accPr" : "grpChrPr");
+      const c = pr ? wVal(wChild(pr, "chr")) : "";
+      const fn = ({ "̂": "\\hat", "̃": "\\tilde", "̄": "\\bar", "̇": "\\dot",
+        "̈": "\\ddot", "⃗": "\\vec", "→": "\\overrightarrow", "←": "\\overleftarrow",
+        "⏞": "\\overbrace", "⏟": "\\underbrace" })[c] || "\\hat";
+      out += `${fn}{${V(wChild(el, "e"))}}`;
+    } else if (l === "m") {
+      const rows = wKids(el, "mr").map(r => wKids(r, "e").map(V).join(" & ")).join(" \\\\ ");
+      out += `\\begin{pmatrix}${rows}\\end{pmatrix}`;
+    } else if (l === "eqArray") out += `\\begin{aligned}${wKids(el, "e").map(V).join(" \\\\ ")}\\end{aligned}`;
+    else out += ommlToLatex(el); // wrappers (m:e, m:num…) and anything unknown
+  }
+  return out;
+}
+const SUP_MAP = { "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹", "+": "⁺", "-": "⁻", "=": "⁼", "(": "⁽", ")": "⁾", "n": "ⁿ", "i": "ⁱ" };
+const SUB_MAP = { "0": "₀", "1": "₁", "2": "₂", "3": "₃", "4": "₄", "5": "₅", "6": "₆", "7": "₇", "8": "₈", "9": "₉", "+": "₊", "-": "₋", "=": "₌", "(": "₍", ")": "₎", "a": "ₐ", "e": "ₑ", "o": "ₒ", "x": "ₓ" };
+function scriptText(text, sup) {
+  const map = sup ? SUP_MAP : SUB_MAP;
+  const folded = text.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+  const uni = [...folded].map(c => map[c]).join("");
+  return uni && uni.length === [...text].length ? uni : (sup ? `^{${folded}}` : `_{${folded}}`);
+}
+function docxRunMd(r) {
+  let text = "", b = false, i = false, vert = "";
+  const walk = n => {
+    if (n.nodeType !== 1) return;
+    const l = wLN(n);
+    if (l === "rPr") { b = !!wChild(n, "b"); i = !!wChild(n, "i"); vert = wVal(wChild(n, "vertAlign")); }
+    else if (l === "t") text += n.textContent;
+    else if (l === "tab") text += " ";
+    else if (l === "br") text += "\n";
+    else if (l === "instrText" || l === "fldChar" || l === "noBreakHyphen" || l === "softHyphen") return;
+    else if (l === "drawing" || l === "pict" || l === "object") return;
+    else [...n.childNodes].forEach(walk);
+  };
+  [...r.childNodes].forEach(walk);
+  if (!text) return "";
+  if (vert === "superscript") text = scriptText(text, true);
+  else if (vert === "subscript") text = scriptText(text, false);
+  if (i && !text.includes("$")) text = `*${text}*`;
+  if (b && !text.includes("$")) text = `**${text}**`;
+  return text;
+}
+function docxParaMd(p) {
+  const pr = wChild(p, "pPr");
+  let style = "", outline = "", bullet = false, quote = false;
+  if (pr) {
+    style = wVal(wChild(pr, "pStyle"));
+    outline = wVal(wChild(pr, "outlineLvl"));
+    bullet = !!wChild(pr, "numPr");
+    quote = /^(intense)?quote$/i.test(style);
+  }
+  const hm = /heading\s*([123])/i.exec(style) || /^([123])$/.exec(style);
+  const heading = hm ? (+(hm[1] || 1)) : ((outline !== "" && +outline <= 2 && !bullet && !quote) ? +outline + 1 : 0);
+  let prefix = "";
+  if (/^title$/i.test(style) || heading === 1) prefix = "# ";
+  else if (heading === 2) prefix = "## ";
+  else if (heading === 3) prefix = "### ";
+  else if (bullet) prefix = "- ";
+  else if (quote) prefix = "> ";
+
+  // a paragraph holding only one equation is Word's display equation
+  const single = [...p.childNodes].filter(n => n.nodeType === 1 && wLN(n) !== "pPr");
+  if (single.length === 1 && /^oMath(Para)?$/.test(wLN(single[0]))) {
+    const latex = polishMath(ommlToLatex(single[0]));
+    return latex ? `$$${latex}$$` : "";
+  }
+
+  let parts = "";
+  const walk = n => {
+    if (n.nodeType !== 1) return;
+    const l = wLN(n);
+    if (l === "pPr") return;
+    if (l === "r") { parts += docxRunMd(n); return; }
+    if (l === "oMathPara") { parts += `\n$$${polishMath(ommlToLatex(n))}$$\n`; return; }
+    if (l === "oMath") { parts += `$${polishMath(ommlToLatex(n))}$`; return; }
+    if (/^(drawing|pict|object|bookmarkStart|bookmarkEnd|proofErr|commentRangeStart|commentRangeEnd|permStart|permEnd|sectPr|tab)$/.test(l)) return;
+    [...n.childNodes].forEach(walk);
+  };
+  [...p.childNodes].forEach(walk);
+
+  const chunks = parts.replace(/[ \t]+/g, " ").split("\n").map(s => s.trim()).filter(Boolean);
+  if (!chunks.length) return "";
+  return chunks.map((c, k) => (k === 0 ? prefix + c : c)).join("\n\n");
+}
+function docxCellMd(tc) {
+  return wKids(tc, "p").map(docxParaMd).filter(Boolean).join(" ")
+    .replace(/\|/g, "\\|").replace(/\s+/g, " ").trim() || " ";
+}
+function docxTableMd(tbl) {
+  const rows = wKids(tbl, "tr").map(tr => wKids(tr, "tc").map(docxCellMd).join(" | "));
+  if (!rows.length) return "";
+  const cols = Math.max(...rows.map(r => r.split(" | ").length));
+  return [rows[0], Array(cols).fill("---").join(" | "), ...rows.slice(1)].join("\n");
+}
+function docxToMarkdown(doc) {
+  const all = [...doc.getElementsByTagName("*")];
+  const body = all.find(e => wLN(e) === "body") || doc.documentElement;
+  const blocks = [];
+  for (const node of [...body.childNodes]) {
+    if (node.nodeType !== 1) continue;
+    const l = wLN(node);
+    if (l === "p") { const s = docxParaMd(node); if (s) blocks.push(s); }
+    else if (l === "tbl") { const s = docxTableMd(node); if (s) blocks.push(s); }
+  }
+  let md = "";
+  blocks.forEach((b, k) => {
+    if (!k) { md = b; return; }
+    const tight = /^[-*>]\s/.test(blocks[k - 1]) || /^[-*]\s/.test(b);
+    md += (tight ? "\n" : "\n\n") + b;
+  });
+  return md.replace(/\n{3,}/g, "\n\n").trim();
+}
+async function importDocx(file) {
+  if (!file) return;
+  if (!/\.docx$/i.test(file.name)) { toast("Only .docx can be read — old .doc is a binary format"); return; }
+  if (typeof JSZip === "undefined") { toast("Importer not loaded yet — reload the page once"); return; }
+  toast("Reading " + file.name + "…");
+  try {
+    const zip = await JSZip.loadAsync(file);
+    const part = zip.file("word/document.xml");
+    if (!part) throw new Error("no word/document.xml — not a Word file");
+    const xml = await part.async("string");
+    const doc = new DOMParser().parseFromString(xml, "application/xml");
+    if (doc.getElementsByTagName("parsererror").length) throw new Error("unreadable XML");
+    const md = docxToMarkdown(doc);
+    if (!md) throw new Error("no text found in the file");
+    $("#rawInput").value = md;
+    syncCount(); render();
+    const eqs = (md.match(/\$\$?[^$]+\$\$?/g) || []).length;
+    toast(`Imported ${file.name} · ${md.split(/\s+/).length} words${eqs ? ` · ${eqs} equation${eqs === 1 ? "" : "s"}` : ""}`);
+  } catch (e) { console.error(e); toast("Import failed — " + e.message); }
+}
+$("#btnImport").onclick = () => $("#fileDocx").click();
+$("#fileDocx").addEventListener("change", e => { const f = e.target.files[0]; e.target.value = ""; if (f) importDocx(f); });
 $("#rawInput").addEventListener("input", syncCount);
 function syncCount() {
   const v = $("#rawInput").value;
@@ -155,16 +372,27 @@ function syncHeader() {
 ["sSchool","sTitle","sSub","sMeta","sInstr","cHeader"].forEach(id => $("#"+id).addEventListener("input", syncHeader));
 
 /* ---------- Preview ---------- */
+/* protect $…$ from Markdown (CommonMark turns \\ into \ and eats matrix rows) */
+let mathStash = [];
+function protectMath(text) {
+  mathStash = [];
+  const save = m => `\u0000${mathStash.push(m) - 1}\u0000`;
+  return text.split(/(```[\s\S]*?```|~~~[\s\S]*?~~~)/)
+    .map((seg, k) => (k % 2 ? seg : seg.replace(/\$\$[\s\S]+?\$\$|\$[^$\n]+?\$/g, save))).join("");
+}
+function restoreMath(html) {
+  return html.replace(/\u0000(\d+)\u0000/g, (m, i) => (mathStash[+i] != null ? mathStash[+i] : m));
+}
 function render() {
   syncHeader();
   const raw = $("#rawInput").value;
   if (!raw.trim()) return;
-  const clean = normalizeAIText(raw);
+  const guarded = protectMath(normalizeAIText(raw));
   let html = "";
-  try { html = marked.parse(clean, { breaks: true }); }
-  catch { html = "<p>" + clean.replace(/\n/g, "<br>") + "</p>"; }
+  try { html = marked.parse(guarded, { breaks: true }); }
+  catch { html = "<p>" + guarded.replace(/\n/g, "<br>") + "</p>"; }
   const body = $("#paperBody");
-  body.innerHTML = html.replace(/\[(\d{1,3}\s*marks?)\]/gi, '<span class="marks" contenteditable="false">[$1]</span>');
+  body.innerHTML = restoreMath(html.replace(/\[(\d{1,3}\s*marks?)\]/gi, '<span class="marks" contenteditable="false">[$1]</span>'));
   [...body.children].forEach(el => { if (/^Q\d+\./.test(el.textContent.trim())) el.classList.add("q"); });
   wrapMathSrc(body);
   try {
@@ -319,13 +547,13 @@ function makeDropdown(rootId, opts) {
     setValue(v) { setValue(v); }
   };
 }
-const GEMINI_MODELS = [{ value: "gemini-1.5-flash", label: "gemini-1.5-flash" }, { value: "gemini-1.5-pro", label: "gemini-1.5-pro" }];
+const GEMINI_MODELS = [{ value: "gemini-3.8-flash", label: "gemini-3.8-flash" }, { value: "gemini-2.5-flash", label: "gemini-2.5-flash" }, { value: "gemini-2.0-flash", label: "gemini-2.0-flash" }];
 const GROQ_MODELS = [{ value: "llama-3.3-70b-versatile", label: "llama-3.3-70b-versatile" }, { value: "llama-3.1-8b-instant", label: "llama-3.1-8b-instant" }];
 const PREF_MODELS = {
-  gemini: ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"],
+  gemini: ["gemini-3.8-flash", "gemini-2.5-flash", "gemini-2.0-flash"],
   groq: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]
 };
-let aiProvider = "auto", aiModel = "gemini-1.5-flash";
+let aiProvider = "auto", aiModel = "gemini-3.8-flash";
 const discovered = { gemini: null, groq: null };   // short-lived in-memory catalogue
 const verified = JSON.parse(localStorage.getItem("bd_verified") || "{}");
 function saveVerified() { try { localStorage.setItem("bd_verified", JSON.stringify(verified)); } catch {} }
@@ -446,11 +674,15 @@ function keyCard(p) {
       const j = await askAI({ provider: p, model: cand,
         messages: [{ role: "user", content: "Reply with exactly: ok" }],
         signal: ctrl.signal, timeout: 25000, maxTokens: 16 });
-      verified[p] = cand; saveVerified();
-      // optionally try the other provider if this one has no working model
-      st(`Verified · ${cand} · ${((performance.now() - t0) / 1000).toFixed(1)}s`, "ok");
-      ddModel.setOptions(discovered[p].map(id => ({ value: id, label: id })));
-      aiModel = cand; ddModel.setValue(cand);
+      // the server may have replaced a retired id with the current model — trust what answered
+      const used = j.model || cand;
+      verified[p] = used; saveVerified();
+      const opts = (discovered[p] || []).slice();
+      if (!opts.includes(used)) opts.unshift(used);
+      ddModel.setOptions(opts.map(id => ({ value: id, label: id })));
+      aiModel = used; ddModel.setValue(used);
+      const swap = (j.switched && j.requested) ? ` · ${j.requested} retired → ${used}` : "";
+      st(`Verified · ${used}${swap} · ${((performance.now() - t0) / 1000).toFixed(1)}s`, "ok");
     } catch (e) {
       const code = e.code ? ` [${e.code}]` : "";
       st("Failed: " + e.message + code + " — you can try the other provider.", "err");
@@ -462,7 +694,8 @@ keyCard("gemini"); keyCard("groq"); refreshStatus();
 function servedLine(j) {
   const el = $("#servedBy");
   el.hidden = false;
-  el.textContent = `Answered by ${j.provider} · ${j.model}${j.ms ? ` · ${(j.ms / 1000).toFixed(1)}s` : ""}`;
+  const swap = (j.switched && j.requested) ? ` · ${j.requested} retired → ${j.model}` : "";
+  el.textContent = `Answered by ${j.provider} · ${j.model}${swap}${j.ms ? ` · ${(j.ms / 1000).toFixed(1)}s` : ""}`;
 }
 function buildPrompt() {
   return `Create a school question paper in clean Markdown. Subject: ${$("#fSubject").value}, ${$("#fClass").value}. ` +
@@ -760,30 +993,83 @@ function matrixBodyToTable(env, body) {
   const rows = splitTop(body, "\\\\").map(r => splitTop(r, "&").map(c => c.trim()));
   return rows.filter(r => r.join("").trim() !== "");
 }
-function linearEnv(env, body) {
-  // inline fallback using REAL growing brackets — editable, compact
+function xmlComponentToString(node) { // docx component tree → XML text (docx has no matrix class)
+  if (node == null) return "";
+  if (typeof node === "string" || typeof node === "number") {
+    return String(node).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+  if (Array.isArray(node)) return node.map(xmlComponentToString).join("");
+  const key = node.rootKey;
+  if (!key) return "";
+  if (key === "_attr") {
+    return Object.entries(node.root || {}).map(([k, v]) => {
+      const name = (node.xmlKeys && node.xmlKeys[k]) || k;
+      return ` ${name}="${String(v).replace(/"/g, "&quot;")}"`;
+    }).join("");
+  }
+  const kids = Array.isArray(node.root) ? node.root : [];
+  const inner = kids.map(xmlComponentToString).join("");
+  return inner ? `<${key}>${inner}</${key}>` : `<${key}/>`;
+}
+function ommlComponent(xml) { // OMML string → real docx component tree (docx's raw-XML class is buggy)
+  const NS = 'xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"' +
+    ' xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"';
+  let src = xml;
+  const head = xml.slice(0, xml.indexOf(">") + 1); // declare namespaces on the fragment root
+  if (head && !/xmlns:m=/.test(head)) src = xml.replace(/^<([A-Za-z:_][\w:.-]*)/, (m, tag) => `<${tag} ${NS}`);
+  const dom = new DOMParser().parseFromString(src, "application/xml");
+  if (dom.getElementsByTagName("parsererror").length) throw new Error("bad omml");
+  const build = el => {
+    const c = new docx.XmlComponent(el.tagName);
+    if (el.attributes && el.attributes.length) {
+      const map = {};
+      for (const a of el.attributes) if (!/^xmlns/.test(a.name)) map[a.name] = a.value;
+      if (Object.keys(map).length) c.root.push(new docx.XmlAttributeComponent(map));
+    }
+    for (const n of el.childNodes) {
+      if (n.nodeType === 3) { if (n.textContent) c.root.push(n.textContent); continue; }
+      c.root.push(build(n));
+    }
+    return c;
+  };
+  return build(dom.documentElement);
+}
+function xmlEsc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+function kidsXml(latex) {
+  try { return latexToMathKids(latex).map(xmlComponentToString).join(""); }
+  catch { return `<m:r><m:t>${xmlEsc(latexFallbackText(latex))}</m:t></m:r>`; }
+}
+function envXml(env, body) { // matrix / cases / align → REAL OMML instead of flattened text
   const e = env.replace("*", "");
   if (/^(matrix|pmatrix|bmatrix|Bmatrix|vmatrix|Vmatrix|array|smallmatrix)$/.test(e)) {
-    const rows = matrixBodyToTable(e, body);
-    const txt = rows.map(r => r.join("  ")).join(";  ");
-    const inner = latexToMathKids(txt);
-    if (e === "pmatrix") return [new docx.MathRoundBrackets({ children: inner })];
-    if (e === "bmatrix") return [new docx.MathSquareBrackets({ children: inner })];
-    if (e === "Bmatrix") return [new docx.MathCurlyBrackets({ children: inner })];
-    if (e === "vmatrix" || e === "Vmatrix") return [MR("‖"), ...inner, MR("‖")];
-    return inner;
+    const src = e === "array" ? body.replace(/^\s*\{[^}]*\}/, "") : body;
+    const rows = matrixBodyToTable(e, src).filter(r => r.some(c => c.trim()));
+    if (!rows.length) return "";
+    const del = { pmatrix: ["(", ")"], bmatrix: ["[", "]"], Bmatrix: ["{", "}"],
+      vmatrix: ["|", "|"], Vmatrix: ["‖", "‖"] }[e];
+    const m = `<m:m><m:mPr><m:mcs><m:mc><m:mcPr><m:count m:val="${rows[0].length}"/>` +
+      `<m:mcJc m:val="center"/></m:mcPr></m:mc></m:mcs></m:mPr>` +
+      rows.map(r => `<m:mr>${r.map(c => `<m:e>${kidsXml(c)}</m:e>`).join("")}</m:mr>`).join("") +
+      `</m:m>`;
+    if (!del) return m;
+    return `<m:d><m:dPr><m:begChr m:val="${del[0]}"/><m:endChr m:val="${del[1]}"/></m:dPr><m:e>${m}</m:e></m:d>`;
   }
-  if (e === "cases" || e === "dcases") {
-    const rows = matrixBodyToTable(e, body);
-    const txt = rows.map(r => r.join("  ")).join(";  ");
-    return [new docx.MathCurlyBrackets({ children: latexToMathKids(txt) })];
+  if (e === "cases" || e === "dcases" || e === "rcases") {
+    const rows = matrixBodyToTable(e, body).filter(r => r.some(c => c.trim()));
+    if (!rows.length) return "";
+    const arr = `<m:eqArray>${rows.map(r => `<m:e>${kidsXml(r.join("  "))}</m:e>`).join("")}</m:eqArray>`;
+    return `<m:d><m:dPr><m:begChr m:val="{"/><m:endChr m:val=" "/></m:dPr><m:e>${arr}</m:e></m:d>`;
   }
   if (/^(align|aligned|gather|gathered|multline|equation|split)$/.test(e)) {
     const rows = splitTop(body, "\\\\").map(r => r.replace(/&/g, " ").trim()).filter(Boolean);
-    const out = [];
-    rows.forEach((r, k) => { if (k) out.push(MR("   ")); latexToMathKids(r).forEach(x => out.push(x)); });
-    return out;
+    if (!rows.length) return "";
+    return `<m:eqArray>${rows.map(r => `<m:e>${kidsXml(r)}</m:e>`).join("")}</m:eqArray>`;
   }
+  return "";
+}
+function linearEnv(env, body) {
+  const xml = envXml(env, body);
+  if (xml) return [ommlComponent(xml)];
   return latexToMathKids(body);
 }
 
@@ -851,9 +1137,12 @@ function blocksFromEl(el, wrap = {}) {
 
   if (tag === "hr") return [new docx.Paragraph({ border: { bottom: { style: docx.BorderStyle.SINGLE, size: 12, color: "6b7280" } }, spacing: { before: 180, after: 180 } })];
   if (/^h[1-3]$/.test(tag)) {
-    const cfg = tag === "h1" ? { size: 52, center: true } : tag === "h2" ? { size: 32, center: true, color: "4b5563" } : { size: 27, color: "4b5563" };
+    const cfg = tag === "h1" ? { size: 52, center: true, lvl: docx.HeadingLevel.HEADING_1 }
+      : tag === "h2" ? { size: 32, center: true, color: "4b5563", lvl: docx.HeadingLevel.HEADING_2 }
+        : { size: 27, color: "4b5563", lvl: docx.HeadingLevel.HEADING_3 };
     return [new docx.Paragraph({
       children: runsFromNode(el, { size: cfg.size, b: true, font: "Poppins", color: cfg.color }),
+      heading: cfg.lvl, // real Word heading style → round-trips through Import too
       spacing: { before: 180, after: 180, ...LINE },
       alignment: cfg.center ? docx.AlignmentType.CENTER : undefined,
       keepNext: true,
