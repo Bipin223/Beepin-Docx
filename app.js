@@ -774,7 +774,7 @@ function keyCard(p) {
       const r = await fetch("/api/models", { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ provider: p }) });
       const j = await r.json();
-      if (j.error) throw new Error(j.error);
+      if (j.error) { const e = new Error(j.error); e.code = j.code; throw e; }
       discovered[p] = j.models.map(m => m.id);
       st(`Found ${discovered[p].length} model${discovered[p].length === 1 ? "" : "s"}${j.cached ? " (cached)" : ""}.`, "ok");
       if ((aiProvider === p) || (aiProvider === "auto" && p === "gemini")) {
@@ -784,8 +784,10 @@ function keyCard(p) {
     } catch (e) { st(e.message, "err"); }
   };
   let cancelFn = null;
+  const failWithCode = (j) => { const e = new Error(j.error); e.code = j.code; return e; };
   $("#test-" + p).onclick = async () => {
     const cancelBtn = $("#cancel-" + p);
+    if (cancelFn) cancelFn(); // supersede any in-flight run so statuses can't interleave
     st("Verifying…");
     cancelBtn.hidden = false;
     const ctrl = new AbortController();
@@ -796,7 +798,7 @@ function keyCard(p) {
         const r = await fetch("/api/models", { method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ provider: p }), signal: ctrl.signal });
         const j = await r.json();
-        if (j.error) throw new Error(j.error);
+        if (j.error) throw failWithCode(j);
         discovered[p] = j.models.map(m => m.id);
       }
       // one candidate only: preferred known-good ∩ discovered, else first — never test them all
@@ -804,7 +806,7 @@ function keyCard(p) {
       if (!cand) throw new Error("No models available for this key.");
       const j = await askAI({ provider: p, model: cand,
         messages: [{ role: "user", content: "Reply with exactly: ok" }],
-        signal: ctrl.signal, timeout: 25000, maxTokens: 256 }); // thinking models need headroom
+        signal: ctrl.signal, timeout: 55000, maxTokens: 256 }); // thinking models need headroom + time
       // the server may have replaced a retired id with the current model — trust what answered
       const used = j.model || cand;
       verified[p] = used; saveVerified();
@@ -815,8 +817,11 @@ function keyCard(p) {
       const swap = (j.switched && j.requested) ? ` · ${j.requested} retired → ${used}` : "";
       st(`Verified · ${used}${swap} · ${((performance.now() - t0) / 1000).toFixed(1)}s`, "ok");
     } catch (e) {
-      const code = e.code ? ` [${e.code}]` : "";
-      st("Failed: " + e.message + code + " — you can try the other provider.", "err");
+      if (e.name === "AbortError") st("Cancelled.", "");
+      else {
+        const code = e.code ? ` [${e.code}]` : "";
+        st("Failed: " + e.message + code + " — you can try the other provider.", "err");
+      }
     } finally { cancelBtn.hidden = true; cancelFn = null; }
   };
   $("#cancel-" + p).onclick = () => { if (cancelFn) cancelFn(); };
