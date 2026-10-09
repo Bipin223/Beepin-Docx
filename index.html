@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
-<link rel="stylesheet" href="styles.css?v=11" />
+<link rel="stylesheet" href="styles.css?v=12" />
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
@@ -155,6 +155,10 @@
       <label>Subject line<input id="sSub" value="Mathematics — Class 10" /></label>
       <label>Meta<input id="sMeta" value="Time: 2 Hours  |  Max Marks: 50" /></label>
       <label>Instructions<textarea id="sInstr" rows="2">1. All questions are compulsory. 2. Show all steps clearly.</textarea></label>
+      <div><label id="lblFont">Document font</label><div class="dd" id="ddFont">
+        <button class="dd-btn" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="lblFont"><span class="dd-val">Georgia + Poppins</span><svg class="dd-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button>
+        <div class="dd-menu" role="listbox" aria-labelledby="lblFont" hidden></div>
+      </div></div>
       <div class="checks">
         <label class="switch"><input type="checkbox" id="cHeader" checked /><span></span>Header</label>
         <label class="switch"><input type="checkbox" id="cNativeMath" checked /><span></span>Native Word equations</label>
@@ -242,6 +246,6 @@
 </div>
 
 <div class="toast" id="toast"></div>
-<script src="app.js?v=11"></script>
+<script src="app.js?v=12"></script>
 </body>
 </html>

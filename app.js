@@ -562,6 +562,33 @@ makeDropdown("ddProvider", {
   options: [{ value: "auto", label: "Auto" }, { value: "gemini", label: "Gemini" }, { value: "groq", label: "Groq" }], value: aiProvider,
   onChange: (v) => { aiProvider = v; }
 });
+
+/* ---------- document font: one picker drives preview + every export ---------- */
+const DOC_FONTS = {
+  "georgia-poppins": { label: "Georgia + Poppins", bodyWord: "Georgia", headWord: "Poppins",
+    bodyCss: 'Georgia,"Times New Roman",serif', headCss: "Poppins,sans-serif" },
+  "times": { label: "Times New Roman", bodyWord: "Times New Roman", headWord: "Times New Roman",
+    bodyCss: '"Times New Roman",Georgia,serif', headCss: '"Times New Roman",Georgia,serif' },
+  "poppins": { label: "Poppins", bodyWord: "Poppins", headWord: "Poppins",
+    bodyCss: "Poppins,sans-serif", headCss: "Poppins,sans-serif" },
+  "system": { label: "System", bodyWord: "Calibri", headWord: "Calibri",
+    bodyCss: 'system-ui,"Segoe UI",Roboto,Arial,sans-serif', headCss: 'system-ui,"Segoe UI",Roboto,Arial,sans-serif' }
+};
+let docFontKey = "georgia-poppins";
+try { docFontKey = localStorage.getItem("bd_font") || "georgia-poppins"; } catch {}
+if (!DOC_FONTS[docFontKey]) docFontKey = "georgia-poppins";
+const docFonts = () => DOC_FONTS[docFontKey] || DOC_FONTS["georgia-poppins"];
+function applyDocFont() {
+  const f = docFonts(), paper = $("#paper");
+  if (paper) { paper.style.setProperty("--doc-body", f.bodyCss); paper.style.setProperty("--doc-head", f.headCss); }
+  try { localStorage.setItem("bd_font", docFontKey); } catch {}
+}
+makeDropdown("ddFont", {
+  options: Object.entries(DOC_FONTS).map(([value, f]) => ({ value, label: f.label })),
+  value: docFontKey,
+  onChange: (v) => { if (DOC_FONTS[v]) { docFontKey = v; applyDocFont(); } }
+});
+applyDocFont();
 try { localStorage.removeItem("bd_key_gemini"); localStorage.removeItem("bd_key_groq"); } catch {}
 
 /* ---------- one frontend entry: askAI({provider, model, messages, signal}) ---------- */
@@ -1089,7 +1116,7 @@ function mathKid(latex) {
 }
 function runsFromNodes(nodes, st = {}) {
   const size = st.size || 23;
-  const font = st.mono ? "Consolas" : (st.font || "Georgia"); // preview paper is Georgia — match it
+  const font = st.mono ? "Consolas" : (st.font || docFonts().bodyWord); // preview paper body — match it
   const color = st.mono ? "0f172a" : st.color;
   const out = [];
   nodes.forEach(ch => {
@@ -1110,8 +1137,8 @@ function runsFromNodes(nodes, st = {}) {
         // preview floats marks to the right margin → right tab stop + small grey text
         const t = ch.textContent.replace(/[\[\]]/g, "").trim();
         if (t) {
-          out.push(new docx.TextRun({ children: [new docx.Tab()], size: 20, font: "Georgia" }));
-          out.push(new docx.TextRun({ text: "[" + t + "]", size: 20, font: "Georgia", color: "4b5563" }));
+          out.push(new docx.TextRun({ children: [new docx.Tab()], size: 20, font: docFonts().bodyWord }));
+          out.push(new docx.TextRun({ text: "[" + t + "]", size: 20, font: docFonts().bodyWord, color: "4b5563" }));
         }
       }
       else {
@@ -1141,7 +1168,7 @@ function blocksFromEl(el, wrap = {}) {
       : tag === "h2" ? { size: 32, center: true, color: "4b5563", lvl: docx.HeadingLevel.HEADING_2 }
         : { size: 27, color: "4b5563", lvl: docx.HeadingLevel.HEADING_3 };
     return [new docx.Paragraph({
-      children: runsFromNode(el, { size: cfg.size, b: true, font: "Poppins", color: cfg.color }),
+      children: runsFromNode(el, { size: cfg.size, b: true, font: docFonts().headWord, color: cfg.color }),
       heading: cfg.lvl, // real Word heading style → round-trips through Import too
       spacing: { before: 180, after: 180, ...LINE },
       alignment: cfg.center ? docx.AlignmentType.CENTER : undefined,
@@ -1163,7 +1190,7 @@ function blocksFromEl(el, wrap = {}) {
       children: [...tr.querySelectorAll("th,td")].map(td => {
         const isHead = td.tagName === "TH" || (ri === 0 && tr.querySelectorAll("th").length > 0);
         return new docx.TableCell({
-          children: [new docx.Paragraph({ children: runsFromNode(td, { size: 20, font: "Poppins" }), spacing: { line: 300, lineRule: docx.LineRuleType.AUTO } })],
+          children: [new docx.Paragraph({ children: runsFromNode(td, { size: 20, font: docFonts().headWord }), spacing: { line: 300, lineRule: docx.LineRuleType.AUTO } })],
           ...(isHead ? { shading: { fill: "f1ede4" } } : {})
         });
       })
@@ -1187,14 +1214,14 @@ function blocksFromEl(el, wrap = {}) {
     return kids;
   }
   if (tag === "li") return [new docx.Paragraph({
-    children: [new docx.TextRun({ text: "•  ", size: 23, font: "Georgia" }), ...runsFromNode(el, { size: 23 })],
+    children: [new docx.TextRun({ text: "•  ", size: 23, font: docFonts().bodyWord }), ...runsFromNode(el, { size: 23 })],
     spacing: { after: 150, ...LINE }, ...wrap
   })];
 
   /* ---- body paragraph (one Word paragraph per preview block) ---- */
   const q = el.classList && el.classList.contains("q");
   const para = (kids, spacing, over = {}) => new docx.Paragraph({
-    children: kids.length ? kids : [new docx.TextRun({ text: "", size: 23, font: "Georgia" })],
+    children: kids.length ? kids : [new docx.TextRun({ text: "", size: 23, font: docFonts().bodyWord })],
     spacing: { ...LINE, ...spacing },
     tabStops,
     keepLines: q || undefined,
@@ -1255,10 +1282,10 @@ async function exportDocx() {
       const H = id => (((document.getElementById(id) || {}).textContent) || "").trim();
       const C = docx.AlignmentType.CENTER;
       const L = { line: 300, lineRule: docx.LineRuleType.AUTO };
-      kids.push(new docx.Paragraph({ children: [new docx.TextRun({ text: H("pSchool") || $("#sSchool").value, bold: true, size: 52, font: "Poppins" })], alignment: C, spacing: { after: 80, ...L } }));      // preview h1: 26px Poppins
-      kids.push(new docx.Paragraph({ children: [new docx.TextRun({ text: H("pTitle") || $("#sTitle").value, bold: true, size: 32, color: "4b5563", font: "Poppins" })], alignment: C, spacing: { after: 60, ...L } })); // preview h2: 16px Poppins
+      kids.push(new docx.Paragraph({ children: [new docx.TextRun({ text: H("pSchool") || $("#sSchool").value, bold: true, size: 52, font: docFonts().headWord })], alignment: C, spacing: { after: 80, ...L } }));      // preview h1: 26px
+      kids.push(new docx.Paragraph({ children: [new docx.TextRun({ text: H("pTitle") || $("#sTitle").value, bold: true, size: 32, color: "4b5563", font: docFonts().headWord })], alignment: C, spacing: { after: 60, ...L } })); // preview h2: 16px
       const meta = (H("pMeta") || `${$("#sSub").value}  •  ${$("#sMeta").value}`).replace(/\s+/g, " ");
-      kids.push(new docx.Paragraph({ children: [new docx.TextRun({ text: meta, size: 20, color: "6b7280", font: "Georgia" })], alignment: C, spacing: { after: 0, ...L } })); // preview .pmeta: 13px
+      kids.push(new docx.Paragraph({ children: [new docx.TextRun({ text: meta, size: 20, color: "6b7280", font: docFonts().bodyWord })], alignment: C, spacing: { after: 0, ...L } })); // preview .pmeta: 13px
       kids.push(new docx.Paragraph({ children: [new docx.TextRun({ text: "", size: 2 })], border: { bottom: { style: docx.BorderStyle.SINGLE, size: 6, color: "b9b3a5" } }, spacing: { before: 180, after: 180 } })); // preview .prule
       const instr = (H("pInstr") || $("#sInstr").value || "").replace(/\s+$/, "");
       if (instr) { // preview .pinstr: 13px warm box
@@ -1266,7 +1293,7 @@ async function exportDocx() {
         const runs = [];
         lines.forEach((ln, k) => {
           if (k) runs.push(new docx.TextRun({ text: "", size: 20, break: 1 }));
-          runs.push(new docx.TextRun({ text: ln, size: 20, color: "4b5563", font: "Georgia" }));
+          runs.push(new docx.TextRun({ text: ln, size: 20, color: "4b5563", font: docFonts().bodyWord }));
         });
         const box = { style: docx.BorderStyle.SINGLE, size: 4, color: "f6f4ef", space: 100 };
         kids.push(new docx.Paragraph({ children: runs, shading: { fill: "f6f4ef" },
@@ -1283,10 +1310,10 @@ async function exportDocx() {
       border: { top: { style: docx.BorderStyle.SINGLE, size: 4, color: "e5e0d4" } },
       spacing: { before: 80, line: 240, lineRule: docx.LineRuleType.AUTO },
       children: [
-        new docx.TextRun({ text: "Beepin Docx", font: "Poppins", size: 18, color: "9ca3af" }),
-        new docx.TextRun({ children: [new docx.Tab()], font: "Poppins", size: 18, color: "9ca3af" }),
-        new docx.TextRun({ text: "Page ", font: "Poppins", size: 18, color: "9ca3af" }),
-        new docx.TextRun({ children: [docx.PageNumber.CURRENT], font: "Poppins", size: 18, color: "9ca3af" })
+        new docx.TextRun({ text: "Beepin Docx", font: docFonts().headWord, size: 18, color: "9ca3af" }),
+        new docx.TextRun({ children: [new docx.Tab()], font: docFonts().headWord, size: 18, color: "9ca3af" }),
+        new docx.TextRun({ text: "Page ", font: docFonts().headWord, size: 18, color: "9ca3af" }),
+        new docx.TextRun({ children: [docx.PageNumber.CURRENT], font: docFonts().headWord, size: 18, color: "9ca3af" })
       ]
     })] });
     const doc = new docx.Document({ sections: [{ children: kids, page: { margin: { top: 1440, bottom: 1440, left: 1440, right: 1440 } }, footers: { default: foot } }] });
@@ -1296,8 +1323,9 @@ async function exportDocx() {
   } catch (e) { console.error(e); toast("Export failed — trying .doc"); exportDoc(); }
 }
 function exportDoc() {
+  const f = docFonts();
   const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><style>
-    body{font-family:Calibri,Arial;font-size:12pt}h1{text-align:center}table{border-collapse:collapse;width:100%}th,td{border:1.5pt solid #000;padding:6px}th{background:#EDE9FE}pre{background:#F1F5F9;padding:10px}</style></head><body>
+    body{font-family:${f.bodyCss};font-size:12pt}h1,h2{font-family:${f.headCss};text-align:center}table{border-collapse:collapse;width:100%}th,td{border:1.5pt solid #000;padding:6px}th{background:#EDE9FE}pre{background:#F1F5F9;padding:10px}</style></head><body>
     <h1>${$("#sSchool").value}</h1><p style="text-align:center">${$("#sTitle").value} — ${$("#sSub").value} • ${$("#sMeta").value}</p><hr/>
     ${$("#paperBody").innerHTML}</body></html>`;
   saveAs(new Blob(["\ufeff", html], { type: "application/msword" }), "beepin-paper.doc");
@@ -1341,9 +1369,11 @@ function exportHtml() {
   const body = $("#paperBody");
   if (!body || !body.textContent.trim()) { toast("Nothing to export yet"); return; }
   const H = id => (((document.getElementById(id) || {}).textContent) || "").trim();
+  const f = docFonts();
   const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>beepin-paper</title>` +
     `<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">` +
-    `<style>body{font-family:Georgia,serif;max-width:800px;margin:40px auto;padding:0 20px;color:#111;line-height:1.7}` +
+    `<style>body{font-family:${f.bodyCss};max-width:800px;margin:40px auto;padding:0 20px;color:#111;line-height:1.7}` +
+    `h1,h2{font-family:${f.headCss}}` +
     `h1{text-align:center}table{border-collapse:collapse;width:100%}th,td{border:1px solid #666;padding:6px}` +
     `pre{background:#22201c;color:#f0e9db;padding:12px;border-radius:8px;overflow:auto}` +
     `blockquote{border-left:3px solid #b26a2b;background:#faf6ee;padding:6px 12px;margin:10px 0}</style></head><body>` +
@@ -1362,14 +1392,15 @@ async function exportPptx() {
   try {
     const H = id => (((document.getElementById(id) || {}).textContent) || "").trim();
     const tx = (el) => ((el.innerText || el.textContent) || "").replace(/\s+/g, " ").trim();
+    const f = docFonts(), BF = f.bodyWord, HF = f.headWord;
     const pptx = new PptxGenJS();
     pptx.defineLayout({ name: "WIDE", width: 13.33, height: 7.5 });
     pptx.layout = "WIDE";
     const cover = pptx.addSlide();
     cover.background = { color: "1F2937" };
-    cover.addText(H("pSchool") || "Question Paper", { x: 0.5, y: 1.4, w: 12.33, h: 1, fontSize: 32, bold: true, color: "FFFFFF", align: "center" });
-    cover.addText(H("pTitle"), { x: 0.5, y: 2.5, w: 12.33, h: 0.7, fontSize: 22, color: "D9D9D9", align: "center" });
-    cover.addText(H("pMeta"), { x: 0.5, y: 3.2, w: 12.33, h: 0.6, fontSize: 14, color: "BFBFBF", align: "center" });
+    cover.addText(H("pSchool") || "Question Paper", { x: 0.5, y: 1.4, w: 12.33, h: 1, fontSize: 32, bold: true, color: "FFFFFF", align: "center", fontFace: HF });
+    cover.addText(H("pTitle"), { x: 0.5, y: 2.5, w: 12.33, h: 0.7, fontSize: 22, color: "D9D9D9", align: "center", fontFace: HF });
+    cover.addText(H("pMeta"), { x: 0.5, y: 3.2, w: 12.33, h: 0.6, fontSize: 14, color: "BFBFBF", align: "center", fontFace: BF });
     let slide = pptx.addSlide(), y = 0.4;
     const need = (h) => { if (y + h > 7.0) { slide = pptx.addSlide(); y = 0.4; } };
     [...body.children].forEach(ch => {
@@ -1377,10 +1408,10 @@ async function exportPptx() {
       const tag = ch.tagName.toLowerCase(), t = tx(ch);
       if (/^h[12]$/.test(tag)) {
         slide = pptx.addSlide(); y = 0.4;
-        slide.addText(t, { x: 0.5, y, w: 12.33, h: 0.9, fontSize: tag === "h1" ? 28 : 24, bold: true, color: "1F2937" });
+        slide.addText(t, { x: 0.5, y, w: 12.33, h: 0.9, fontSize: tag === "h1" ? 28 : 24, bold: true, color: "1F2937", fontFace: HF });
         y += 1.1;
       }
-      else if (tag === "h3") { if (!t) return; need(0.7); slide.addText(t, { x: 0.6, y, w: 12.1, h: 0.6, fontSize: 18, bold: true, color: "1F2937" }); y += 0.75; }
+      else if (tag === "h3") { if (!t) return; need(0.7); slide.addText(t, { x: 0.6, y, w: 12.1, h: 0.6, fontSize: 18, bold: true, color: "1F2937", fontFace: HF }); y += 0.75; }
       else if (tag === "hr") { need(0.4); slide.addShape(pptx.shapes.LINE, { x: 0.6, y: y + 0.15, w: 12.1, h: 0, line: { color: "808080", width: 1.5 } }); y += 0.4; }
       else if (tag === "table") {
         const rows = [...ch.querySelectorAll("tr")]
@@ -1390,7 +1421,7 @@ async function exportPptx() {
         const h = rows.length * 0.38 + 0.1;
         need(h);
         slide.addTable(rows.map((r, ri) => r.map(c => ({
-          text: c, options: { fontSize: 12, color: "111111", fill: ri === 0 ? { color: "EDE9FE" } : undefined, bold: ri === 0 }
+          text: c, options: { fontSize: 12, color: "111111", fill: ri === 0 ? { color: "EDE9FE" } : undefined, bold: ri === 0, fontFace: HF }
         }))), { x: 0.6, y, w: 12.1, border: { pt: 1, color: "666666" } });
         y += h + 0.15;
       }
@@ -1401,13 +1432,13 @@ async function exportPptx() {
         slide.addText(t, { x: 0.6, y, w: 12.1, h, fontSize: 11, fontFace: "Consolas", fill: { color: "0F172A" }, color: "E2E8F0" });
         y += h + 0.15;
       }
-      else if (tag === "blockquote") { if (!t) return; need(0.8); slide.addText(t, { x: 0.9, y, w: 11.8, h: 0.7, fontSize: 14, italic: true, color: "4B5563" }); y += 0.85; }
+      else if (tag === "blockquote") { if (!t) return; need(0.8); slide.addText(t, { x: 0.9, y, w: 11.8, h: 0.7, fontSize: 14, italic: true, color: "4B5563", fontFace: BF }); y += 0.85; }
       else {
         if (!t) return;
         const prefix = tag === "li" ? "•  " : "";
         const h = Math.max(0.5, Math.ceil((prefix + t).length / 105) * 0.42);
         need(h);
-        slide.addText(prefix + t, { x: 0.6, y, w: 12.1, h, fontSize: 15, color: "111111" });
+        slide.addText(prefix + t, { x: 0.6, y, w: 12.1, h, fontSize: 15, color: "111111", fontFace: BF });
         y += h + 0.1;
       }
     });
