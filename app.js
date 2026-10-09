@@ -65,12 +65,12 @@ function setTheme(n, ev) {
     }).catch(() => {});
   } catch { apply(); }
 }
-/* ---------- Theme palette: swatches (light/dark/night all in one palette) ---------- */
-/* The sun/moon button stays the quick light↔dark toggle; the palette picks any theme. */
+/* ---------- Theme palette: extra themes only (light/dark live on the toggle) ---------- */
+/* Closed until clicked; closes on pick, outside click, or Escape. */
 (function initPalette() {
   const btn = document.getElementById("themeMoreBtn"), pop = document.getElementById("themePalette");
   if (!btn || !pop) return;
-  THEMES.forEach(t => {
+  THEMES.filter(t => t.value !== "light" && t.value !== "dark").forEach(t => {
     const b = document.createElement("button");
     b.className = "sw"; b.setAttribute("role", "option");
     b.dataset.theme = t.value; b.title = t.label;
@@ -492,7 +492,7 @@ let zoom = 90, fitZoom = 1;
 function computeFit() {
   const scroller = document.querySelector(".paper-scroll");
   const avail = scroller ? scroller.clientWidth - 4 : 794;
-  fitZoom = Math.min(1, avail / 794); // shrink whole sheet to fit, margins stay proportional
+  fitZoom = Math.min(1, avail / (794 + 2 * marginPx())); // whole sheet incl. margins
 }
 function applyZoom() {
   computeFit();
@@ -622,6 +622,59 @@ makeDropdown("ddFont", {
   onChange: (v) => { if (DOC_FONTS[v]) { docFontKey = v; applyDocFont(); } }
 });
 applyDocFont();
+
+/* ---------- page margins: presets + custom, preview and Word stay identical ---------- */
+const MARGIN_PRESETS = {
+  narrow: { label: 'Narrow (0.5")', inch: 0.5 },
+  normal: { label: 'Normal (1")', inch: 1 },
+  wide: { label: 'Wide (1.5")', inch: 1.5 },
+  custom: { label: "Custom…", inch: null }
+};
+var marginKey = "normal", marginCustom = 1; // var: computeFit may run before this line
+try {
+  marginKey = localStorage.getItem("bd_margin") || "normal";
+  marginCustom = parseFloat(localStorage.getItem("bd_margin_custom")) || 1;
+} catch {}
+if (!MARGIN_PRESETS[marginKey]) marginKey = "normal";
+function marginInch() { // const-free: computeFit may run before MARGIN_PRESETS initializes
+  if (marginKey === "narrow") return 0.5;
+  if (marginKey === "wide") return 1.5;
+  if (marginKey === "custom") {
+    const v = parseFloat(marginCustom);
+    return Math.min(2, Math.max(0.25, isFinite(v) ? v : 1));
+  }
+  return 1;
+}
+function marginPx() { return Math.round(marginInch() * 96); }      // 96 CSS px = 1 inch
+function marginTwips() { return Math.round(marginInch() * 1440); }  // Word twips
+function tabPosTwips() { return 11906 - marginTwips() * 2; }        // A4 usable width
+function applyMargins() {
+  const paper = $("#paper");
+  if (paper && paper.style) paper.style.padding = marginPx() + "px";
+  let st = document.getElementById("pgMargin");
+  if (!st) { st = document.createElement("style"); st.id = "pgMargin"; document.head.append(st); }
+  st.textContent = `@media print{@page{size:A4;margin:${(marginInch() * 25.4).toFixed(1)}mm}}`;
+  try { localStorage.setItem("bd_margin", marginKey); localStorage.setItem("bd_margin_custom", String(marginCustom)); } catch {}
+  applyZoom();
+}
+makeDropdown("ddMargin", {
+  options: Object.entries(MARGIN_PRESETS).map(([value, m]) => ({ value, label: m.label })),
+  value: marginKey,
+  onChange: (v) => {
+    marginKey = v;
+    const w = document.getElementById("marginCustomWrap");
+    if (w) w.hidden = (v !== "custom");
+    applyMargins();
+  }
+});
+(function initMarginInput() {
+  const inp = document.getElementById("fMargin"), w = document.getElementById("marginCustomWrap");
+  if (!inp) return;
+  inp.value = marginCustom;
+  if (w) w.hidden = (marginKey !== "custom");
+  inp.addEventListener("input", () => { marginCustom = parseFloat(inp.value); applyMargins(); });
+})();
+applyMargins();
 try { localStorage.removeItem("bd_key_gemini"); localStorage.removeItem("bd_key_groq"); } catch {}
 
 /* ---------- one frontend entry: askAI({provider, model, messages, signal}) ---------- */
@@ -1191,7 +1244,7 @@ function runsFromNode(node, st = {}) { return runsFromNodes([...node.childNodes]
 function blocksFromEl(el, wrap = {}) {
   const tag = el.tagName.toLowerCase();
   const LINE = { line: 420, lineRule: docx.LineRuleType.AUTO }; // preview: 15px Georgia, line-height 1.75
-  const TABPOS = 9026; // usable width = 11906 − 1440 − 1440 margins
+  const TABPOS = tabPosTwips(); // usable A4 width after margins
   const tabStops = (el.querySelector && el.querySelector(".marks"))
     ? [{ type: docx.TabStopType.RIGHT, position: TABPOS }] : undefined;
 
@@ -1339,7 +1392,7 @@ async function exportDocx() {
     });
     // preview footer: thin rule, "Beepin Docx" left, page number right
     const foot = new docx.Footer({ children: [new docx.Paragraph({
-      tabStops: [{ type: docx.TabStopType.RIGHT, position: 9026 }],
+      tabStops: [{ type: docx.TabStopType.RIGHT, position: tabPosTwips() }],
       border: { top: { style: docx.BorderStyle.SINGLE, size: 4, color: "e5e0d4" } },
       spacing: { before: 80, line: 240, lineRule: docx.LineRuleType.AUTO },
       children: [
@@ -1349,7 +1402,8 @@ async function exportDocx() {
         new docx.TextRun({ children: [docx.PageNumber.CURRENT], font: docFonts().headWord, size: 18, color: "9ca3af" })
       ]
     })] });
-    const doc = new docx.Document({ sections: [{ children: kids, page: { margin: { top: 1440, bottom: 1440, left: 1440, right: 1440 } }, footers: { default: foot } }] });
+    const M = marginTwips(); // preview padding and Word margins are the same inches
+    const doc = new docx.Document({ sections: [{ children: kids, properties: { page: { margin: { top: M, bottom: M, left: M, right: M } } }, footers: { default: foot } }] });
     const blob = await docx.Packer.toBlob(doc);
     saveAs(blob, "beepin-paper.docx");
     toast("Downloaded beepin-paper.docx");
