@@ -18,23 +18,38 @@ const NULL_EL = new Proxy(function () {}, {
 const toast = (m) => { const t = $("#toast"); t.textContent = m; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2600); };
 const CHECK_SVG = '<svg class="dd-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
 
-/* ---------- Theme gallery: circular reveal from the menu choice ---------- */
+/* ---------- Theme families: palette picks the family, toggle flips its day/night ---------- */
 const THEMES = [
-  { value: "light", label: "Light", bg: "#f6f1e8", acc: "#b26a2b" },
-  { value: "dark", label: "Dark", bg: "#161009", acc: "#d9985a" },
-  { value: "amoled", label: "AMOLED", bg: "#000000", acc: "#d9985a" },
-  { value: "mono", label: "Mono", bg: "#0f0f0f", acc: "#d4d4d4" },
-  { value: "forest", label: "Forest", bg: "#0b130d", acc: "#7fb069" }
+  { value: "light", label: "Light" }, { value: "dark", label: "Dark" },
+  { value: "amoled", label: "AMOLED" }, { value: "amoled-day", label: "AMOLED Day" },
+  { value: "mono", label: "Mono" }, { value: "mono-day", label: "Mono Day" },
+  { value: "forest", label: "Forest" }, { value: "forest-day", label: "Forest Day" }
+];
+const DAY_OF = { paper: "light", amoled: "amoled-day", mono: "mono-day", forest: "forest-day" };
+const NIGHT_OF = { paper: "dark", amoled: "amoled", mono: "mono", forest: "forest" };
+const PALETTE = [
+  { family: "paper", label: "Paper", bg: "#f6f1e8", acc: "#b26a2b" },
+  { family: "amoled", label: "AMOLED", bg: "#000000", acc: "#d9985a" },
+  { family: "mono", label: "Mono", bg: "#0f0f0f", acc: "#d4d4d4" },
+  { family: "forest", label: "Forest", bg: "#0b130d", acc: "#7fb069" }
 ];
 function currentTheme() {
   const t = document.documentElement.dataset.theme;
   return THEMES.some(x => x.value === t) ? t : "dark";
 }
+function themeFamily(t) {
+  t = t || currentTheme();
+  return (t === "light" || t === "dark") ? "paper" : t.replace(/-day$/, "");
+}
+function themeMode(t) {
+  t = t || currentTheme();
+  return (t === "light" || /-day$/.test(t)) ? "day" : "night";
+}
 function paintToggle() {
-  const light = currentTheme() === "light";
+  const day = themeMode() === "day";
   const b = $("#themeToggle");
-  b.setAttribute("aria-pressed", String(light));
-  b.setAttribute("aria-label", light ? "Switch to dark theme" : "Switch to light theme");
+  b.setAttribute("aria-pressed", String(day));
+  b.setAttribute("aria-label", day ? "Switch to night mode" : "Switch to day mode");
 }
 (function initTheme() {
   let s = "dark";
@@ -65,28 +80,31 @@ function setTheme(n, ev) {
     }).catch(() => {});
   } catch { apply(); }
 }
-/* ---------- Theme palette: extra themes only (light/dark live on the toggle) ---------- */
+/* ---------- Theme palette: family picker (keeps the current day/night mode) ---------- */
 /* Closed until clicked; closes on pick, outside click, or Escape. */
 (function initPalette() {
   const btn = document.getElementById("themeMoreBtn"), pop = document.getElementById("themePalette");
   if (!btn || !pop) return;
-  THEMES.filter(t => t.value !== "light" && t.value !== "dark").forEach(t => {
+  PALETTE.forEach(p => {
     const b = document.createElement("button");
     b.className = "sw"; b.setAttribute("role", "option");
-    b.dataset.theme = t.value; b.title = t.label;
-    b.setAttribute("aria-label", t.label + " theme");
+    b.dataset.family = p.family; b.title = p.label;
+    b.setAttribute("aria-label", p.label + " theme family");
     const dot = document.createElement("span");
     dot.className = "dot";
-    dot.style.background = `linear-gradient(135deg,${t.acc} 0 50%,${t.bg} 50% 100%)`;
+    dot.style.background = `linear-gradient(135deg,${p.acc} 0 50%,${p.bg} 50% 100%)`;
     const lb = document.createElement("span");
-    lb.className = "sw-label"; lb.textContent = t.label;
+    lb.className = "sw-label"; lb.textContent = p.label;
     b.append(dot, lb);
-    b.addEventListener("click", (e) => { setTheme(t.value, e); close(); });
+    b.addEventListener("click", (e) => {
+      setTheme(themeMode() === "day" ? DAY_OF[p.family] : NIGHT_OF[p.family], e);
+      close();
+    });
     pop.append(b);
   });
   let open = false;
   const paint = () => pop.querySelectorAll(".sw").forEach(s =>
-    s.setAttribute("aria-selected", String(s.dataset.theme === currentTheme())));
+    s.setAttribute("aria-selected", String(s.dataset.family === themeFamily())));
   function close() { open = false; btn.setAttribute("aria-expanded", "false"); pop.classList.remove("open"); pop.hidden = true; }
   new MutationObserver(paint).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
   paint();
@@ -100,7 +118,7 @@ function setTheme(n, ev) {
   document.addEventListener("click", (e) => { if (open && !document.getElementById("ddTheme").contains(e.target)) close(); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && open) { close(); btn.focus(); } });
 })();
-$("#themeToggle").addEventListener("click", (e) => setTheme(currentTheme() === "light" ? "dark" : "light", e));
+$("#themeToggle").addEventListener("click", (e) => setTheme(themeMode() === "day" ? NIGHT_OF[themeFamily()] : DAY_OF[themeFamily()], e));
 
 /* ---------- Tabs ---------- */
 const tabs = [...document.querySelectorAll(".tab")];

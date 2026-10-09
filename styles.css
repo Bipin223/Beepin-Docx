@@ -60,6 +60,28 @@ html[data-theme="forest"]{
 html[data-theme="dark"] .btn.primary,html[data-theme="amoled"] .btn.primary{color:#241505}
 html[data-theme="mono"] .btn.primary{color:#141414}
 html[data-theme="forest"] .btn.primary{color:#0e1a10}
+/* day variants: same families, light surfaces */
+html[data-theme="amoled-day"]{
+  --bg:#ffffff;--surface:#faf6ec;--surface-2:#f1e8d5;--surface-3:#e4d5b8;
+  --txt:#241a10;--mut:#8c7861;--acc:#a8621f;--acc-2:#5d8f57;
+  --acc-soft:rgba(168,98,31,.12);--wave:rgba(168,98,31,.10);
+  --shadow:0 10px 28px rgba(96,62,20,.12);--shadow-lg:0 18px 44px rgba(96,62,20,.18);
+  --menu-bg:rgba(250,246,236,.85);--field:#f6f0e1;
+}
+html[data-theme="mono-day"]{
+  --bg:#f4f4f4;--surface:#ffffff;--surface-2:#e9e9e9;--surface-3:#d9d9d9;
+  --txt:#1a1a1a;--mut:#6f6f6f;--acc:#3d3d3d;--acc-2:#8a8a8a;
+  --acc-soft:rgba(0,0,0,.07);--wave:rgba(0,0,0,.06);
+  --shadow:0 10px 28px rgba(0,0,0,.10);--shadow-lg:0 18px 44px rgba(0,0,0,.14);
+  --menu-bg:rgba(255,255,255,.85);--field:#efefef;
+}
+html[data-theme="forest-day"]{
+  --bg:#edf3e8;--surface:#fbfdf8;--surface-2:#e3ebda;--surface-3:#d0dec2;
+  --txt:#1d2b1f;--mut:#6d826d;--acc:#4e7d4f;--acc-2:#a86f2c;
+  --acc-soft:rgba(78,125,79,.13);--wave:rgba(78,125,79,.10);
+  --shadow:0 10px 28px rgba(46,74,48,.12);--shadow-lg:0 18px 44px rgba(46,74,48,.17);
+  --menu-bg:rgba(251,253,248,.85);--field:#f0f4ea;
+}
 .btn.primary:hover{filter:brightness(1.07);background:var(--acc)}
 .btn.ghost{background:transparent;color:var(--mut)}
 .btn.ghost:hover{color:var(--txt);background:var(--acc-soft);box-shadow:none}
@@ -76,8 +98,8 @@ html[data-theme="forest"] .btn.primary{color:#0e1a10}
 .theme-toggle svg{position:absolute;transition:transform .45s var(--ease-relaxed),opacity .3s}
 .theme-toggle .moon{transform:translateY(0);opacity:1}
 .theme-toggle .sun{transform:translateY(140%);opacity:0}
-html[data-theme="light"] .theme-toggle .moon{transform:translateY(-140%);opacity:0}
-html[data-theme="light"] .theme-toggle .sun{transform:translateY(0);opacity:1}
+html[data-theme="light"] .theme-toggle .moon,html[data-theme$="-day"] .theme-toggle .moon{transform:translateY(-140%);opacity:0}
+html[data-theme="light"] .theme-toggle .sun,html[data-theme$="-day"] .theme-toggle .sun{transform:translateY(0);opacity:1}
 .dd .theme-more{width:40px;padding:0}
 .dd .theme-more .dd-val{display:none}
 .menu-right{left:auto;right:0;min-width:170px}
@@ -253,7 +275,7 @@ body.focus-paper .a4{max-width:100%}
 .ans-text{font-size:13px;white-space:pre-wrap;max-height:220px;overflow:auto;margin:0 0 10px}
 /* ---------- toast ---------- */
 .toast{position:fixed;bottom:22px;left:50%;transform:translate(-50%,70px);background:#2b2118;color:#f5ecdd;padding:11px 20px;border-radius:14px;font-size:13.5px;opacity:0;transition:transform .35s var(--ease-relaxed),opacity .3s;z-index:99;box-shadow:var(--shadow-lg);max-width:min(90vw,480px);text-align:center}
-html[data-theme="light"] .toast{background:#3b2e21}
+html[data-theme="light"] .toast,html[data-theme$="-day"] .toast{background:#3b2e21}
 .toast.show{transform:translate(-50%,0);opacity:1}
 /* entrance */
 .pop-in{animation:rise .45s var(--ease-motion) both}
