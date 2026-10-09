@@ -20,9 +20,11 @@ const CHECK_SVG = '<svg class="dd-check" viewBox="0 0 24 24" fill="none" stroke=
 
 /* ---------- Theme gallery: circular reveal from the menu choice ---------- */
 const THEMES = [
-  { value: "light", label: "Light" }, { value: "dark", label: "Dark" },
-  { value: "amoled", label: "AMOLED" }, { value: "mono", label: "Mono" },
-  { value: "forest", label: "Forest" }
+  { value: "light", label: "Light", bg: "#f6f1e8", acc: "#b26a2b" },
+  { value: "dark", label: "Dark", bg: "#161009", acc: "#d9985a" },
+  { value: "amoled", label: "AMOLED", bg: "#000000", acc: "#d9985a" },
+  { value: "mono", label: "Mono", bg: "#0f0f0f", acc: "#d4d4d4" },
+  { value: "forest", label: "Forest", bg: "#0b130d", acc: "#7fb069" }
 ];
 function currentTheme() {
   const t = document.documentElement.dataset.theme;
@@ -63,10 +65,41 @@ function setTheme(n, ev) {
     }).catch(() => {});
   } catch { apply(); }
 }
-makeDropdown("ddTheme", {
-  options: THEMES, value: currentTheme(),
-  onChange: (v, ev) => setTheme(v, ev)
-});
+/* ---------- Theme palette: swatches (light/dark/night all in one palette) ---------- */
+/* The sun/moon button stays the quick light↔dark toggle; the palette picks any theme. */
+(function initPalette() {
+  const btn = document.getElementById("themeMoreBtn"), pop = document.getElementById("themePalette");
+  if (!btn || !pop) return;
+  THEMES.forEach(t => {
+    const b = document.createElement("button");
+    b.className = "sw"; b.setAttribute("role", "option");
+    b.dataset.theme = t.value; b.title = t.label;
+    b.setAttribute("aria-label", t.label + " theme");
+    const dot = document.createElement("span");
+    dot.className = "dot";
+    dot.style.background = `linear-gradient(135deg,${t.acc} 0 50%,${t.bg} 50% 100%)`;
+    const lb = document.createElement("span");
+    lb.className = "sw-label"; lb.textContent = t.label;
+    b.append(dot, lb);
+    b.addEventListener("click", (e) => { setTheme(t.value, e); close(); });
+    pop.append(b);
+  });
+  let open = false;
+  const paint = () => pop.querySelectorAll(".sw").forEach(s =>
+    s.setAttribute("aria-selected", String(s.dataset.theme === currentTheme())));
+  function close() { open = false; btn.setAttribute("aria-expanded", "false"); pop.classList.remove("open"); pop.hidden = true; }
+  new MutationObserver(paint).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  paint();
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    open = !open;
+    btn.setAttribute("aria-expanded", String(open));
+    if (open) { paint(); pop.hidden = false; pop.classList.add("open"); }
+    else close();
+  });
+  document.addEventListener("click", (e) => { if (open && !document.getElementById("ddTheme").contains(e.target)) close(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && open) { close(); btn.focus(); } });
+})();
 $("#themeToggle").addEventListener("click", (e) => setTheme(currentTheme() === "light" ? "dark" : "light", e));
 
 /* ---------- Tabs ---------- */
