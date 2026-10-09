@@ -31,7 +31,7 @@ LAST_GOOD = {}       # provider -> last model that actually succeeded
 RECOMMENDED = {"gemini": "gemini-3.8-flash", "groq": "llama-3.3-70b-versatile"}
 FALLBACK_MODELS = {"gemini": RECOMMENDED["gemini"], "groq": RECOMMENDED["groq"]}
 VISION_MODELS = {"gemini": RECOMMENDED["gemini"], "groq": "meta-llama/llama-4-scout-17b-16e-instruct"}
-UPSTREAM_TIMEOUT = 50
+UPSTREAM_TIMEOUT = 110
 DISCOVERY_TIMEOUT = 20
 
 
@@ -92,7 +92,7 @@ def gemini_payload(messages, max_tokens):
                 parts.append({"inline_data": {"mime_type": "image/jpeg", "data": b64}})
             contents.append({"role": "model" if role == "assistant" else "user", "parts": parts})
     body = {"contents": contents or [{"role": "user", "parts": [{"text": "hi"}]}],
-            "generationConfig": {"maxOutputTokens": max_tokens or 1024, "temperature": 0.7}}
+            "generationConfig": {"maxOutputTokens": max_tokens or 4096, "temperature": 0.7}}
     if system:
         body["systemInstruction"] = {"parts": [{"text": "\n".join(system)}]}
     return body
@@ -134,7 +134,7 @@ def groq_payload(messages, max_tokens):
             ]})
         else:
             out.append({"role": role, "content": m.get("content", "")})
-    return {"model": None, "messages": out, "temperature": 0.7, "max_tokens": max_tokens or 1024}
+    return {"model": None, "messages": out, "temperature": 0.7, "max_tokens": max_tokens or 4096}
 
 
 def groq_text(resp):

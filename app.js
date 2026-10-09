@@ -845,7 +845,7 @@ $("#btnGenerate").onclick = async () => {
     const j = await askAI({ provider: aiProvider, model: aiModel, messages: [
       { role: "system", content: "You write clean Markdown exam papers with LaTeX math." },
       { role: "user", content: buildPrompt() }
-    ]});
+    ], maxTokens: 8192, timeout: 120000 }); // thinking models need a big budget + time
     if (!j.text.trim()) throw new Error("Empty response — try again.");
     $("#rawInput").value = j.text; syncCount(); render(); tabs[0].click();
     servedLine(j);
@@ -1660,7 +1660,7 @@ $("#btnAskImg").onclick = async () => {
       messages: [
         { role: "system", content: "Extract text faithfully. Return math in $...$ / $$...$$ LaTeX." },
         { role: "user", content: q, image: attachedImage }
-      ], vision: true });
+      ], vision: true, maxTokens: 4096 });
     const answer = j.text;
     if (!answer.trim()) throw new Error("Empty response — try again.");
     servedLine(j);
