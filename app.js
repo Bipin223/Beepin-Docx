@@ -804,7 +804,7 @@ function keyCard(p) {
       if (!cand) throw new Error("No models available for this key.");
       const j = await askAI({ provider: p, model: cand,
         messages: [{ role: "user", content: "Reply with exactly: ok" }],
-        signal: ctrl.signal, timeout: 25000, maxTokens: 16 });
+        signal: ctrl.signal, timeout: 25000, maxTokens: 256 }); // thinking models need headroom
       // the server may have replaced a retired id with the current model — trust what answered
       const used = j.model || cand;
       verified[p] = used; saveVerified();

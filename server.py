@@ -103,11 +103,22 @@ def gemini_text(resp):
     if not cands:
         reason = ((resp.get("promptFeedback") or {}).get("blockReason")) or "empty response"
         return None, {"error": f"Gemini declined: {reason}", "code": "REFUSED"}
-    parts = (((cands[0] or {}).get("content") or {}).get("parts")) or []
-    text = "".join(p.get("text", "") for p in parts)
-    if not text:
-        return None, {"error": "Gemini returned no text", "code": "BAD_RESPONSE"}
-    return text, None
+    cand = cands[0] or {}
+    parts = ((cand.get("content") or {}).get("parts")) or []
+    text = "".join(p.get("text", "") for p in parts
+                   if isinstance(p, dict) and not p.get("thought") and isinstance(p.get("text", ""), str))
+    if text:
+        return text, None
+    # 200 OK but no answer text — report why instead of a dead-end error
+    det = f"finish={cand.get('finishReason') or '?'}"
+    ratings = [r for r in (cand.get("safetyRatings") or []) if isinstance(r, dict)]
+    if ratings:
+        det += " safety=[" + ",".join(
+            f"{str(r.get('category', '?')).split('/')[-1]}={r.get('probability', '?')}"
+            for r in ratings) + "]"
+    if any(isinstance(p, dict) and p.get("thought") for p in parts):
+        det += "; answer empty because the model spent its tokens thinking (raise maxTokens)"
+    return None, {"error": f"Gemini returned no text ({det})", "code": "BAD_RESPONSE"}
 
 
 def groq_payload(messages, max_tokens):
