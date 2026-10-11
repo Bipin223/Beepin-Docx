@@ -52,11 +52,15 @@ function paintToggle() {
   b.setAttribute("aria-label", day ? "Switch to night mode" : "Switch to day mode");
 }
 (function initTheme() {
-  let s = "dark";
-  try { s = localStorage.getItem("bd_theme") || "dark"; } catch {}
-  if (!THEMES.some(x => x.value === s)) s = "dark"; // night/caffeine → dark
+  let s = "forest-day", v = "";
+  try {
+    s = localStorage.getItem("bd_theme") || "forest-day";
+    v = localStorage.getItem("bd_theme_v") || "";
+  } catch {}
+  if (!THEMES.some(x => x.value === s)) s = "forest-day";
+  if (v !== "2") s = "forest-day"; // new default ships once to existing profiles too
   document.documentElement.dataset.theme = s;
-  try { localStorage.setItem("bd_theme", s); } catch {}
+  try { localStorage.setItem("bd_theme", s); localStorage.setItem("bd_theme_v", "2"); } catch {}
   paintToggle();
 })();
 function setTheme(n, ev) {
