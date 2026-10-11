@@ -244,6 +244,9 @@ body.focus-paper .a4{max-width:100%}
 .q{margin:12px 0;padding:8px 10px;border-radius:8px}
 .paper-body hr{border:none;border-top:1.5px solid #6b7280;margin:14px 0}
 .paper-foot{display:flex;justify-content:space-between;color:#9ca3af;font-size:12px;border-top:1px solid #e5e0d4;margin-top:26px;padding-top:10px;font-family:var(--doc-head,Poppins,sans-serif)}
+/* direct-PDF capture: no shadow, keep blocks whole across pages */
+.pdf-export{box-shadow:none!important}
+.pdf-export table,.pdf-export pre,.pdf-export .q,.pdf-export h1,.pdf-export h2,.pdf-export h3,.pdf-export .paper-foot{break-inside:avoid;page-break-inside:avoid}
 .empty{text-align:center;color:#9ca3af;padding:80px 20px;font-family:var(--doc-head,Poppins,sans-serif)}
 .empty-icon{font-size:38px}
 #paperBody{outline:none;caret-color:var(--acc)}

@@ -580,12 +580,31 @@ $("#zoomIn").onclick = () => { zoom = Math.min(140, zoom + 10); applyZoom(); };
 $("#zoomOut").onclick = () => { zoom = Math.max(60, zoom - 10); applyZoom(); };
 applyZoom();
 
-/* ---------- PDF (via print — full fidelity, no backend) ---------- */
+/* ---------- PDF (direct download, no print dialog) ---------- */
 document.title = "beepin-paper";
-$("#btnPdf").onclick = () => {
-  if (!$("#rawInput").value.trim()) { toast("Nothing to export yet"); return; }
-  toast("Choose “Save as PDF” in the print dialog");
-  setTimeout(() => window.print(), 350);
+$("#btnPdf").onclick = async () => {
+  const paper = $("#paper");
+  if (!paper || !$("#paperBody").textContent.trim()) { toast("Nothing to export yet"); return; }
+  if (typeof html2pdf === "undefined") { window.print(); return; } // offline fallback
+  toast("Building PDF…");
+  const oldZoom = paper.style.zoom, oldTf = paper.style.transform;
+  paper.style.zoom = 1; paper.style.transform = "none"; // capture at true A4 size
+  paper.classList.add("pdf-export");
+  try {
+    await html2pdf().set({
+      margin: 0,
+      filename: "beepin-paper.pdf",
+      image: { type: "jpeg", quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff", logging: false },
+      jsPDF: { unit: "px", format: [794, 1123], orientation: "portrait", hotfixes: ["px_scaling"] },
+      pagebreak: { mode: ["css", "legacy"] }
+    }).from(paper).save();
+    toast("Downloaded beepin-paper.pdf");
+  } catch (e) { console.error(e); toast("PDF failed — use More → Print instead"); }
+  finally {
+    paper.style.zoom = oldZoom; paper.style.transform = oldTf;
+    paper.classList.remove("pdf-export");
+  }
 };
 /* ---------- More-formats menu ---------- */
 const ddExport = $("#ddExport"), btnMore = $("#btnMore"), exportMenu = ddExport.querySelector(".dd-menu");
