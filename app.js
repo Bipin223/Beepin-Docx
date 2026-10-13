@@ -63,6 +63,7 @@ function paintToggle() {
   try { localStorage.setItem("bd_theme", s); localStorage.setItem("bd_theme_v", "2"); } catch {}
   paintToggle();
 })();
+let revealing = false; // a running reveal never blocks the next pick
 function setTheme(n, ev) {
   if (n === currentTheme() || !THEMES.some(x => x.value === n)) return;
   const apply = () => {
@@ -72,17 +73,20 @@ function setTheme(n, ev) {
   };
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const keyboard = ev && ev.detail === 0; // Enter/Space: no pointer position → instant
-  if (!ev || keyboard || reduce || !document.startViewTransition) { apply(); return; } // fallback: instant
+  if (!ev || keyboard || reduce || revealing || !document.startViewTransition) { apply(); return; }
+  revealing = true;
+  const done = () => { revealing = false; };
   const x = ev.clientX, y = ev.clientY;
   const r = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
   try {
     const tr = document.startViewTransition(apply);
+    tr.finished.then(done, done);
     tr.ready.then(() => {
       document.documentElement.animate(
         { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${r}px at ${x}px ${y}px)`] },
         { duration: 900, easing: "cubic-bezier(.4,0,.2,1)", pseudoElement: "::view-transition-new(root)" });
     }).catch(() => {});
-  } catch { apply(); }
+  } catch { done(); apply(); }
 }
 /* ---------- Theme palette: family picker (keeps the current day/night mode) ---------- */
 /* Closed until clicked; closes on pick, outside click, or Escape. */
@@ -103,6 +107,7 @@ function setTheme(n, ev) {
     b.addEventListener("click", (e) => {
       setTheme(themeMode() === "day" ? DAY_OF[p.family] : NIGHT_OF[p.family], e);
       close();
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
     });
     pop.append(b);
   });
