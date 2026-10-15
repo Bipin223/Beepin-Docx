@@ -432,9 +432,10 @@ function syncHeader() {
   const footL = ($("#fFoot").value || "").trim(), showPg = $("#cPageNum").checked;
   $("#pFootL").textContent = footL;
   $("#pFootR").textContent = showPg ? "Page 1" : "";
+  $("#pFootR").style.marginLeft = (showPg && !footL) ? "auto" : "";
   $("#paperFoot").style.display = (!footL && !showPg) ? "none" : "";
   try {
-    localStorage.setItem("bd_cfg", JSON.stringify({ m: $("#cMeta").checked, i: $("#cInstrBox").checked, p: showPg, f: $("#fFoot").value }));
+    localStorage.setItem("bd_cfg", JSON.stringify({ v: 2, m: $("#cMeta").checked, i: $("#cInstrBox").checked, p: showPg, f: $("#fFoot").value }));
   } catch {}
 }
 ["sSchool","sTitle","sSub","sMeta","sInstr","cHeader","cMeta","cInstrBox","fFoot","cPageNum"].forEach(id => $("#"+id).addEventListener("input", syncHeader));
@@ -444,7 +445,9 @@ function syncHeader() {
     if (c.m === false) document.getElementById("cMeta").checked = false;
     if (c.i === false) document.getElementById("cInstrBox").checked = false;
     if (c.p === false) document.getElementById("cPageNum").checked = false;
-    if (typeof c.f === "string") document.getElementById("fFoot").value = c.f;
+    // v1 profiles stored the old "Beepin Docx" footer text — treat it as the default, not a choice
+    const legacyBrand = c.v !== 2 && c.f === "Beepin Docx";
+    if (typeof c.f === "string" && !legacyBrand) document.getElementById("fFoot").value = c.f;
   } catch {}
 })();
 
@@ -1509,8 +1512,9 @@ async function exportDocx() {
     const HF = { font: docFonts().headWord, size: 18, color: "9ca3af" };
     const footKids = [];
     if (footL) footKids.push(new docx.TextRun({ text: footL, ...HF }));
-    if (footL && showPg) footKids.push(new docx.TextRun({ children: [new docx.Tab()], ...HF }));
+    if (showPg && footL) footKids.push(new docx.TextRun({ children: [new docx.Tab()], ...HF }));
     if (showPg) {
+      if (!footL) footKids.push(new docx.TextRun({ children: [new docx.Tab()], ...HF }));
       footKids.push(new docx.TextRun({ text: "Page ", ...HF }));
       footKids.push(new docx.TextRun({ children: [docx.PageNumber.CURRENT], ...HF }));
     }

@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
-<link rel="stylesheet" href="styles.css?v=30" />
+<link rel="stylesheet" href="styles.css?v=31" />
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
@@ -146,8 +146,8 @@
       <label>School<input id="sSchool" value="Sunrise Public School" /></label>
       <label>Exam title<input id="sTitle" value="Term Examination" /></label>
       <label>Subject line<input id="sSub" value="Mathematics — Class 10" /></label>
-      <label>Meta<input id="sMeta" value="Time: 2 Hours  |  Max Marks: 50" /></label>
-      <label>Instructions<textarea id="sInstr" rows="2">1. All questions are compulsory. 2. Show all steps clearly.</textarea></label>
+      <label>Meta<input id="sMeta" value="Time: 2 Hours  |  Max. Marks: 50" /></label>
+      <label>Instructions<textarea id="sInstr" rows="3">1. All questions are compulsory. 2. Show all steps clearly. 3. Write neatly and legibly.</textarea></label>
       <div class="row wrap">
         <button id="btnLogo" class="btn ghost sm" title="Add your school logo to the header">School logo ↑</button>
         <button id="btnLogoClear" class="btn ghost sm" hidden>Remove logo</button>
@@ -157,7 +157,7 @@
         <label class="switch"><input type="checkbox" id="cMeta" checked /><span></span>Details line</label>
         <label class="switch"><input type="checkbox" id="cInstrBox" checked /><span></span>Instructions box</label>
       </div>
-      <label>Footer left<input id="fFoot" value="Beepin Docx" /></label>
+      <label>Footer left<input id="fFoot" placeholder="e.g. Mathematics — Class 10" /></label>
       <div class="checks">
         <label class="switch"><input type="checkbox" id="cPageNum" checked /><span></span>Page number</label>
       </div>
@@ -258,6 +258,6 @@
 </div>
 
 <div class="toast" id="toast"></div>
-<script src="app.js?v=30"></script>
+<script src="app.js?v=31"></script>
 </body>
 </html>
