@@ -129,11 +129,14 @@ function setTheme(n, ev) {
 })();
 $("#themeToggle").addEventListener("click", (e) => setTheme(themeMode() === "day" ? NIGHT_OF[themeFamily()] : DAY_OF[themeFamily()], e));
 
-/* Sidebar is now one ordered column; these reveal the result instead of switching tabs */
-function revealPreview() {
-  const el = document.querySelector("#paper");
-  if (el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "start" });
-}
+/* ---------- Tabs ---------- */
+const tabs = [...document.querySelectorAll(".tab")];
+tabs.forEach((b) => b.onclick = () => {
+  tabs.forEach(x => { x.classList.remove("active"); x.setAttribute("aria-selected", "false"); });
+  b.classList.add("active"); b.setAttribute("aria-selected", "true");
+  document.querySelectorAll(".tabpage").forEach(p => p.classList.remove("show"));
+  $("#page-" + b.dataset.tab).classList.add("show");
+});
 function updatePageChip() {
   const chip = document.getElementById("pageChip"), paper = $("#paper");
   if (!chip || !paper) return;
@@ -938,7 +941,7 @@ $("#btnGenerate").onclick = async () => {
       { role: "user", content: buildPrompt() }
     ], maxTokens: 8192, timeout: 120000 }); // thinking models need a big budget + time
     if (!j.text.trim()) throw new Error("Empty response — try again.");
-    $("#rawInput").value = structurePaper(j.text); syncCount(); render(); revealPreview();
+    $("#rawInput").value = structurePaper(j.text); syncCount(); render(); tabs[0].click();
     servedLine(j);
     st.className = "status ok"; st.textContent = "Done.";
   } catch (e) { st.className = "status err"; st.textContent = e.message + (e.code ? ` [${e.code}]` : ""); }
@@ -1782,7 +1785,7 @@ $("#btnAskImg").onclick = async () => {
     const use = document.createElement("button");
     use.className = "btn primary sm";
     use.textContent = "Send to editor";
-    use.onclick = () => { $("#rawInput").value = answer; syncCount(); render(); revealPreview(); toast("Sent to editor — review, then export"); };
+    use.onclick = () => { $("#rawInput").value = answer; syncCount(); render(); tabs[0].click(); toast("Sent to editor — review, then export"); };
     row.appendChild(use);
     box.append(pre, row);
   } catch (e) { box.innerHTML = "<p class='status err'>" + e.message + (e.code ? ` [${e.code}]` : "") + "</p>"; }
@@ -1855,13 +1858,13 @@ function sendChat() {
     chatBubble("assistant", answer, {
       actions: [
         { label: "Apply to paper", primary: true, fn: () => {
-            $("#rawInput").value = stripPaperFences(answer); syncCount(); render(); revealPreview();
+            $("#rawInput").value = stripPaperFences(answer); syncCount(); render(); tabs[0].click();
             toast("Applied to the paper — review, then export");
           } },
         { label: "Insert as question", fn: () => {
             const add = "\n\n" + stripPaperFences(answer);
             const cur = $("#rawInput").value.replace(/\s+$/, "");
-            $("#rawInput").value = (cur ? cur + add : add.trim()); syncCount(); render(); revealPreview();
+            $("#rawInput").value = (cur ? cur + add : add.trim()); syncCount(); render(); tabs[0].click();
             toast("Appended to the paper");
           } },
         { label: "Copy", fn: () => { navigator.clipboard.writeText(answer).then(() => toast("Copied"), () => toast("Copy failed")); } }
