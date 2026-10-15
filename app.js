@@ -1775,4 +1775,94 @@ $("#btnAskImg").onclick = async () => {
   } catch (e) { box.innerHTML = "<p class='status err'>" + e.message + (e.code ? ` [${e.code}]` : "") + "</p>"; }
 };
 
+/* ---------- Chat with AI (paper-aware) ---------- */
+const chatHistory = [];
+const chatLog = $("#chatLog");
+$("#chatToggle").addEventListener("click", () => {
+  const btn = $("#chatToggle"), reg = $("#chatRegion");
+  setExpanded(reg, btn, reg.hidden);
+});
+function chatPaperText() {
+  const raw = $("#rawInput").value.trim();
+  if (raw) return raw;
+  return ($("#paperBody").innerText || "").trim();
+}
+function chatBubble(role, text, opts = {}) {
+  const b = document.createElement("div");
+  b.className = "chat-msg " + role;
+  b.textContent = text;
+  if (opts.actions) {
+    const row = document.createElement("div");
+    row.className = "chat-actions";
+    opts.actions.forEach(a => {
+      const btn = document.createElement("button");
+      btn.className = "btn " + (a.primary ? "primary " : "ghost ") + "sm";
+      btn.textContent = a.label;
+      btn.onclick = a.fn;
+      row.appendChild(btn);
+    });
+    b.appendChild(row);
+  }
+  chatLog.appendChild(b);
+  chatLog.scrollTop = chatLog.scrollHeight;
+  return b;
+}
+function chatSystemPrompt() {
+  const paper = chatPaperText();
+  return "You are helping improve a school question paper inside the Beepin Docx app. " +
+    "Answer the user's request directly and concisely. When the user asks you to rewrite, fix, add, or regenerate paper content, " +
+    "reply with the COMPLETE updated paper in clean Markdown only (headings, questions as Q1. ... [N marks], math in $...$ / $$...$$ LaTeX) " +
+    "and no commentary, so it can be dropped straight into the editor. Clean markdown only — no preamble, no code fences around the whole paper." +
+    (paper ? "\n\nCurrent paper:\n" + paper : "\n\nThe paper is currently empty.");
+}
+function stripPaperFences(s) {
+  const t = s.trim();
+  const m = /^```(?:markdown|md)?\s*\n([\s\S]*?)\n```$/.exec(t);
+  return m ? m[1].trim() : t;
+}
+function sendChat() {
+  const inp = $("#chatInput"), send = $("#btnChatSend");
+  const q = (inp.value || "").trim();
+  if (!q) return;
+  inp.value = "";
+  chatBubble("user", q);
+  chatHistory.push({ role: "user", content: q });
+  send.disabled = true;
+  const thinking = chatBubble("sys", "Thinking…");
+  askAI({
+    provider: "gemini", model: aiModel,
+    messages: [{ role: "system", content: chatSystemPrompt() }, ...chatHistory.slice(-8)],
+    maxTokens: 8192, timeout: 120000
+  }).then(j => {
+    thinking.remove();
+    const answer = (j.text || "").trim();
+    if (!answer) { chatBubble("sys", "Empty response — try again."); return; }
+    servedLine(j);
+    chatHistory.push({ role: "assistant", content: answer });
+    chatBubble("assistant", answer, {
+      actions: [
+        { label: "Apply to paper", primary: true, fn: () => {
+            $("#rawInput").value = stripPaperFences(answer); syncCount(); render(); tabs[0].click();
+            toast("Applied to the paper — review, then export");
+          } },
+        { label: "Insert as question", fn: () => {
+            const add = "\n\n" + stripPaperFences(answer);
+            const cur = $("#rawInput").value.replace(/\s+$/, "");
+            $("#rawInput").value = (cur ? cur + add : add.trim()); syncCount(); render(); tabs[0].click();
+            toast("Appended to the paper");
+          } },
+        { label: "Copy", fn: () => { navigator.clipboard.writeText(answer).then(() => toast("Copied"), () => toast("Copy failed")); } }
+      ]
+    });
+  }).catch(e => {
+    thinking.remove();
+    chatBubble("sys", "Failed: " + e.message + (e.code ? ` [${e.code}]` : ""));
+  }).finally(() => { send.disabled = false; inp.focus(); });
+}
+$("#btnChatSend").onclick = sendChat;
+$("#chatInput").addEventListener("keydown", e => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(); }
+});
+$("#btnChatClear").onclick = () => { chatHistory.length = 0; chatLog.innerHTML = ""; toast("Chat cleared"); };
+
 syncHeader(); syncCount();

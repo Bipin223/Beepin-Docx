@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
-<link rel="stylesheet" href="styles.css?v=29" />
+<link rel="stylesheet" href="styles.css?v=30" />
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
@@ -120,6 +120,22 @@
         <label>Ask about the photo<input id="imgQ" placeholder="e.g. Extract all questions as Markdown with $LaTeX$" /></label>
         <button id="btnAskImg" class="btn primary morph wide">Ask AI about photo</button>
         <div id="imgAns" class="img-ans" hidden></div>
+        </div>
+      </div>
+      <div class="chat-ai">
+        <button id="chatToggle" class="exp-toggle" aria-expanded="false" aria-controls="chatRegion">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          Chat with AI
+          <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div id="chatRegion" class="exp-body" hidden>
+          <div id="chatLog" class="chat-log"></div>
+          <div class="row">
+            <input id="chatInput" placeholder="e.g. Rewrite Q4 to be harder — or ask anything about the paper" autocomplete="off" />
+            <button id="btnChatSend" class="btn primary sm" title="Send (Enter)">Send</button>
+            <button id="btnChatClear" class="btn ghost sm" title="Clear the conversation">Clear</button>
+          </div>
+          <p class="hint">The chat sees your current paper as context. Use <b>Apply</b> on a reply to drop it straight into the paper.</p>
         </div>
       </div>
       <button id="btnGenerate" class="btn primary morph wide"><span id="genLabel">Generate with AI</span></button>
@@ -242,6 +258,6 @@
 </div>
 
 <div class="toast" id="toast"></div>
-<script src="app.js?v=29"></script>
+<script src="app.js?v=30"></script>
 </body>
 </html>
