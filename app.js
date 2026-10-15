@@ -141,9 +141,14 @@ function updatePageChip() {
   const chip = document.getElementById("pageChip"), paper = $("#paper");
   if (!chip || !paper) return;
   const scale = (typeof currentEff === "number" && currentEff > 0.05) ? currentEff : 1;
-  const layoutH = (paper.getBoundingClientRect().height || 1123) / scale; // rect is zoom-scaled
-  const pages = Math.max(1, Math.ceil(layoutH / 1123 - 0.01));
-  chip.textContent = "A4 · " + pages + " page" + (pages > 1 ? "s" : "");
+  const h = pageDims().h;
+  const layoutH = (paper.getBoundingClientRect().height || h) / scale; // rect is zoom-scaled
+  const pages = Math.max(1, Math.ceil(layoutH / h - 0.01));
+  const parts = ["A4"];
+  if (pageOrient === "landscape") parts.push("landscape");
+  if (pageCols === 2) parts.push("2 col");
+  parts.push(pages + " page" + (pages > 1 ? "s" : ""));
+  chip.textContent = parts.join(" · ");
 }
 
 /* ---------- Author modal ---------- */
@@ -583,10 +588,16 @@ $("#paperBody").addEventListener("paste", e => {
 
 /* ---------- Zoom ---------- */
 let zoom = 90, fitZoom = 1, currentEff = 1;
+var pageOrient = "portrait", pageCols = 1; // page setup (Word parity: orientation + columns)
+function pageDims() {
+  return pageOrient === "landscape"
+    ? { w: 1123, h: 794, tw: 16838, th: 11906 }
+    : { w: 794, h: 1123, tw: 11906, th: 16838 };
+}
 function computeFit() {
   const scroller = document.querySelector(".paper-scroll");
   const avail = scroller ? scroller.clientWidth - 4 : 794;
-  fitZoom = Math.min(1, avail / (794 + 2 * marginPx())); // whole sheet incl. margins
+  fitZoom = Math.min(1, avail / (pageDims().w + 2 * marginPx())); // whole sheet incl. margins
 }
 function applyZoom() {
   computeFit();
@@ -610,6 +621,7 @@ $("#btnPdf").onclick = async () => {
   if (!paper || !$("#paperBody").textContent.trim()) { toast("Nothing to export yet"); return; }
   if (typeof html2pdf === "undefined") { window.print(); return; } // offline fallback
   toast("Building PDF…");
+  const dims = pageDims(), orient = pageOrient; // snapshot for the async capture
   const oldZoom = paper.style.zoom, oldTf = paper.style.transform;
   paper.style.zoom = 1; paper.style.transform = "none"; // capture at true A4 size
   paper.classList.add("pdf-export");
@@ -619,7 +631,7 @@ $("#btnPdf").onclick = async () => {
       filename: "docxzal-paper.pdf",
       image: { type: "jpeg", quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff", logging: false },
-      jsPDF: { unit: "px", format: [794, 1123], orientation: "portrait", hotfixes: ["px_scaling"] },
+      jsPDF: { unit: "px", format: [dims.w, dims.h], orientation: orient, hotfixes: ["px_scaling"] },
       pagebreak: { mode: ["css", "legacy"] }
     }).from(paper).save();
     toast("Downloaded docxzal-paper.pdf");
@@ -763,7 +775,7 @@ function applyMargins() {
   if (paper && paper.style) paper.style.padding = marginPx() + "px";
   let st = document.getElementById("pgMargin");
   if (!st) { st = document.createElement("style"); st.id = "pgMargin"; document.head.append(st); }
-  st.textContent = `@media print{@page{size:A4;margin:${(marginInch() * 25.4).toFixed(1)}mm}}`;
+  st.textContent = `@media print{@page{size:A4 ${pageOrient};margin:${(marginInch() * 25.4).toFixed(1)}mm}}`;
   try { localStorage.setItem("bd_margin", marginKey); localStorage.setItem("bd_margin_custom", String(marginCustom)); } catch {}
   applyZoom();
 }
@@ -785,6 +797,33 @@ makeDropdown("ddMargin", {
   inp.addEventListener("input", () => { marginCustom = parseFloat(inp.value); applyMargins(); });
 })();
 applyMargins();
+
+/* ---------- page orientation + columns: preview and Word stay identical ---------- */
+try {
+  pageOrient = localStorage.getItem("bd_orient") === "landscape" ? "landscape" : "portrait";
+  pageCols = localStorage.getItem("bd_cols") === "2" ? 2 : 1;
+} catch {}
+function applyPageSetup() {
+  const paper = $("#paper");
+  if (paper && paper.classList) paper.classList.toggle("landscape", pageOrient === "landscape");
+  const body = $("#paperBody");
+  if (body && body.classList) body.classList.toggle("two-col", pageCols === 2);
+  applyMargins();       // @page orientation lives in the print style tag
+  applyZoom();          // refit the sheet width
+  updatePageChip();
+  try { localStorage.setItem("bd_orient", pageOrient); localStorage.setItem("bd_cols", String(pageCols)); } catch {}
+}
+makeDropdown("ddOrient", {
+  options: [{ value: "portrait", label: "Portrait" }, { value: "landscape", label: "Landscape" }],
+  value: pageOrient,
+  onChange: (v) => { pageOrient = (v === "landscape") ? "landscape" : "portrait"; applyPageSetup(); }
+});
+makeDropdown("ddCols", {
+  options: [{ value: "one", label: "One column" }, { value: "two", label: "Two columns" }],
+  value: pageCols === 2 ? "two" : "one",
+  onChange: (v) => { pageCols = (v === "two") ? 2 : 1; applyPageSetup(); }
+});
+applyPageSetup();
 try { localStorage.removeItem("bd_key_gemini"); } catch {}
 
 /* ---------- one frontend entry: askAI({provider, model, messages, signal}) ---------- */
@@ -1484,6 +1523,7 @@ async function exportDocx() {
   if (typeof docx === "undefined") { exportDoc(); return; }
   toast("Building .docx from your edited paper…");
   try {
+    const orient = pageOrient, cols = pageCols, dims = pageDims(); // snapshot: async export must not see mid-flight changes
     const kids = [];
     if ($("#cHeader").checked && $("#paperHead").style.display !== "none") {
       const H = id => (((document.getElementById(id) || {}).textContent) || "").trim();
@@ -1515,6 +1555,7 @@ async function exportDocx() {
           border: { top: box, bottom: box, left: box, right: box }, spacing: { after: 180, ...L } }));
       }
     }
+    const headerCount = kids.length; // everything above is the single-column header block
     [...body.children].forEach(ch => {
       if (ch.nodeType !== 1 || (ch.classList && ch.classList.contains("empty"))) return;
       blocksFromEl(ch).forEach(b => kids.push(b));
@@ -1538,18 +1579,45 @@ async function exportDocx() {
       children: footKids
     })] });
     const M = marginTwips(); // preview padding and Word margins are the same inches
-    const doc = new docx.Document({ sections: [{ children: kids, properties: { page: { margin: { top: M, bottom: M, left: M, right: M } } }, footers: { default: foot } }] });
-    const blob = await docx.Packer.toBlob(doc);
+    const pageProps = { margin: { top: M, bottom: M, left: M, right: M }, size: { width: dims.tw, height: dims.th } };
+    const lastKids = kids.splice(headerCount); // body paragraphs (header kids stay single-column)
+    const sections = [];
+    if (cols === 2) {
+      // Word parity: header on top in one column, questions flow in two (continuous section break)
+      sections.push({ children: kids, properties: { page: pageProps, column: { count: 1 } }, footers: { default: foot } });
+      sections.push({ children: lastKids, properties: { page: pageProps, column: { count: 2, space: 720 }, type: docx.SectionType.CONTINUOUS }, footers: { default: foot } });
+    } else {
+      sections.push({ children: kids.concat(lastKids), properties: { page: pageProps, column: { count: 1 } }, footers: { default: foot } });
+    }
+    const doc = new docx.Document({ sections });
+    let blob = await docx.Packer.toBlob(doc);
+    if (orient === "landscape") blob = await patchLandscape(blob);
     saveAs(blob, "docxzal-paper.docx");
     toast("Downloaded docxzal-paper.docx");
   } catch (e) { console.error(e); toast("Export failed — trying .doc"); exportDoc(); }
 }
+async function patchLandscape(blob) { // docx emits correct w/h but keeps orient="portrait"
+  try {
+    const zip = await JSZip.loadAsync(blob);
+    const f = zip.file("word/document.xml");
+    if (!f) return blob;
+    let xml = await f.async("string");
+    xml = xml.replace(/<w:pgSz([^>]*?)w:orient="portrait"/g, '<w:pgSz$1w:orient="landscape"');
+    zip.file("word/document.xml", xml);
+    return await zip.generateAsync({
+      type: "blob",
+      mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    });
+  } catch { return blob; }
+}
 function exportDoc() {
   const f = docFonts();
+  const cols = pageCols === 2 ? "column-count:2;column-gap:48px" : "";
   const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><style>
-    body{font-family:${f.bodyCss};font-size:12pt}h1,h2{font-family:${f.headCss};text-align:center}table{border-collapse:collapse;width:100%}th,td{border:1.5pt solid #000;padding:6px}th{background:#EDE9FE}pre{background:#F1F5F9;padding:10px}</style></head><body>
+    @page{size:A4 ${pageOrient};margin:${marginInch()}in}
+    body{font-family:${f.bodyCss};font-size:12pt}h1,h2{font-family:${f.headCss};text-align:center}table{border-collapse:collapse;width:100%}th,td{border:1.5pt solid #000;padding:6px}th{background:#EDE9FE}pre{background:#F1F5F9;padding:10px}.q-body{${cols}}</style></head><body>
     <h1>${$("#sSchool").value}</h1><p style="text-align:center">${$("#sTitle").value} — ${$("#sSub").value} • ${$("#sMeta").value}</p><hr/>
-    ${$("#paperBody").innerHTML}</body></html>`;
+    <div class="q-body">${$("#paperBody").innerHTML}</div></body></html>`;
   saveAs(new Blob(["\ufeff", html], { type: "application/msword" }), "docxzal-paper.doc");
   toast("Downloaded docxzal-paper.doc");
 }
@@ -1594,7 +1662,8 @@ function exportHtml() {
   const f = docFonts();
   const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>docxzal-paper</title>` +
     `<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">` +
-    `<style>body{font-family:${f.bodyCss};max-width:800px;margin:40px auto;padding:0 20px;color:#111;line-height:1.7}` +
+    `<style>@page{size:A4 ${pageOrient};margin:${marginInch()}in}` +
+    `body{font-family:${f.bodyCss};max-width:800px;margin:40px auto;padding:0 20px;color:#111;line-height:1.7;${pageCols === 2 ? "column-count:2;column-gap:48px;" : ""}}` +
     `h1,h2{font-family:${f.headCss}}` +
     `h1{text-align:center}table{border-collapse:collapse;width:100%}th,td{border:1px solid #666;padding:6px}` +
     `pre{background:#22201c;color:#f0e9db;padding:12px;border-radius:8px;overflow:auto}` +
