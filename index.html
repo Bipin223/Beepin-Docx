@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Beepin Docx — AI Paper to Word</title>
+<title>Docxzal — AI Paper to Word</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
-<link rel="stylesheet" href="styles.css?v=31" />
+<link rel="stylesheet" href="styles.css?v=33" />
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
@@ -23,8 +23,8 @@
 
 <header class="topbar glass pop-in">
   <div class="brand">
-    <img src="favicon.svg" alt="Beepin Docx" class="logo-img" />
-    <div><strong>Beepin Docx</strong><small>AI → Word papers</small></div>
+    <img src="favicon.svg" alt="Docxzal" class="logo-img" />
+    <div><strong>Docxzal</strong><small>AI → Word papers</small></div>
   </div>
   <button id="themeToggle" class="icon-btn theme-toggle" aria-label="Switch theme" aria-pressed="false" title="Day / night">
     <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
@@ -46,136 +46,155 @@
 
 <main class="layout">
   <section class="panel glass pop-in d1">
-    <div class="tabs" role="tablist" aria-label="Input mode">
-      <button class="tab active" data-tab="paste" role="tab" aria-selected="true"><span class="wv"></span><span class="tab-in"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>Paste</span></button>
-      <button class="tab" data-tab="ai" role="tab" aria-selected="false"><span class="wv"></span><span class="tab-in"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.9 5.8L19.7 10l-5.8 1.9L12 17.7l-1.9-5.8L4.3 10l5.8-1.9z"/></svg>Generate</span></button>
-      <button class="tab" data-tab="style" role="tab" aria-selected="false"><span class="wv"></span><span class="tab-in"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>Style</span></button>
+    <div class="steps" aria-label="How this works">
+      <span class="step-chip"><b>1</b>Add content</span>
+      <span class="step-chip"><b>2</b>Paper setup</span>
+      <span class="step-chip"><b>3</b>Edit</span>
+      <span class="step-chip"><b>4</b>Download</span>
     </div>
 
-    <div class="tabpage show" id="page-paste">
-      <textarea id="rawInput" spellcheck="false" placeholder="Paste messy AI paper here…"></textarea>
-      <div class="row">
-        <button id="btnClean" class="btn primary morph">Clean & Preview</button>
-        <button id="btnImport" class="btn ghost" title="Open an existing Word file, keep its equations, and clean it">.docx ↑</button>
-        <button id="btnSample" class="btn ghost">Sample</button>
-        <button id="btnClearPaste" class="btn ghost">Clear</button>
-      </div>
-      <input type="file" id="fileDocx" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden />
-    </div>
-
-    <div class="tabpage" id="page-ai">
-      <button id="setToggle" class="exp-toggle" aria-expanded="false" aria-controls="setRegion">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        Provider settings
+    <details class="step" open>
+      <summary>
+        <span class="step-n">1</span>
+        <span class="step-t">Add your questions<small>Paste · AI · Word file · Photo</small></span>
         <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
-      </button>
-      <div id="setRegion" class="exp-body" hidden>
-        <div class="keycard" id="kc-gemini">
-          <div class="keycard-head"><strong>Gemini</strong><span class="kstatus" id="ks-gemini">No key</span></div>
-          <div class="keyrow">
-            <input type="password" id="key-gemini" placeholder="Gemini API key" autocomplete="off" spellcheck="false" />
-            <button class="tbtn" id="show-gemini" title="Show key" aria-label="Show Gemini key"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
-            <button class="tbtn" id="clear-gemini" title="Clear key" aria-label="Clear Gemini key">✕</button>
-          </div>
-          <div class="row wrap">
-            <button class="btn ghost sm" id="save-gemini">Save</button>
-            <button class="btn ghost sm" id="disc-gemini">Discover</button>
-            <button class="btn ghost sm" id="test-gemini">Test</button>
-            <button class="btn ghost sm" id="cancel-gemini" hidden>Cancel</button>
-          </div>
-          <div class="status" id="st-gemini"></div>
-        </div>
-      </div>
-      <div class="ai-grid">
-        <div><label id="lblModel">Model</label><div class="dd" id="ddModel">
-          <button class="dd-btn" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="lblModel"><span class="dd-val">gemini-3.8-flash</span><svg class="dd-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button>
-          <div class="dd-menu" role="listbox" aria-labelledby="lblModel" hidden></div>
-        </div></div>
-      </div>
-      <div class="served" id="servedBy" hidden></div>
-      <div class="ai-grid">
-        <label>Subject<input id="fSubject" value="Mathematics" /></label>
-        <label>Class<input id="fClass" value="Class 10" /></label>
-        <label>Marks<input id="fMarks" value="50" /></label>
-        <label>Time<input id="fTime" value="2 hours" /></label>
-      </div>
-      <label>Topics<textarea id="fTopics" rows="2">Quadratic equations, Trigonometry, Probability</textarea></label>
-      <div class="photo-ai">
-        <button id="photoToggle" class="exp-toggle" aria-expanded="false" aria-controls="photoRegion">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-          Photo to AI
-          <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
-        </button>
-        <div id="photoRegion" class="exp-body" hidden>
+      </summary>
+      <div class="step-body">
+        <p class="hint">Pick any one way to add questions — paste text, let AI write the paper, open a Word file, or snap a photo.</p>
+        <textarea id="rawInput" spellcheck="false" placeholder="Paste messy AI paper here…"></textarea>
         <div class="row">
-          <button id="btnCamera" class="btn ghost sm">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-          Take photo</button>
-          <button id="btnUpload" class="btn ghost sm">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          Upload</button>
-          <input type="file" id="fileImg" accept="image/*" hidden />
+          <button id="btnClean" class="btn primary morph">Clean & Preview</button>
+          <button id="btnImport" class="btn ghost" title="Open an existing Word file, keep its equations, and clean it">.docx ↑</button>
+          <button id="btnSample" class="btn ghost">Sample</button>
+          <button id="btnClearPaste" class="btn ghost">Clear</button>
         </div>
-        <div id="imgPrevWrap" class="img-prev" hidden><img id="imgPrev" alt="attached photo" /><button id="imgClear" class="mini-x" title="Remove photo" aria-label="Remove photo">✕</button></div>
-        <label>Ask about the photo<input id="imgQ" placeholder="e.g. Extract all questions as Markdown with $LaTeX$" /></label>
-        <button id="btnAskImg" class="btn primary morph wide">Ask AI about photo</button>
-        <div id="imgAns" class="img-ans" hidden></div>
-        </div>
-      </div>
-      <div class="chat-ai">
-        <button id="chatToggle" class="exp-toggle" aria-expanded="false" aria-controls="chatRegion">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-          Chat with AI
+        <input type="file" id="fileDocx" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden />
+
+        <div class="sub-head">Or let AI write the paper</div>
+        <button id="setToggle" class="exp-toggle" aria-expanded="false" aria-controls="setRegion">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          Step 0 — connect your API key
           <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
         </button>
-        <div id="chatRegion" class="exp-body" hidden>
-          <div id="chatLog" class="chat-log"></div>
-          <div class="row">
-            <input id="chatInput" placeholder="e.g. Rewrite Q4 to be harder — or ask anything about the paper" autocomplete="off" />
-            <button id="btnChatSend" class="btn primary sm" title="Send (Enter)">Send</button>
-            <button id="btnChatClear" class="btn ghost sm" title="Clear the conversation">Clear</button>
+        <div id="setRegion" class="exp-body" hidden>
+          <div class="keycard" id="kc-gemini">
+            <div class="keycard-head"><strong>Gemini</strong><span class="kstatus" id="ks-gemini">No key</span></div>
+            <div class="keyrow">
+              <input type="password" id="key-gemini" placeholder="Gemini API key" autocomplete="off" spellcheck="false" />
+              <button class="tbtn" id="show-gemini" title="Show key" aria-label="Show Gemini key"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+              <button class="tbtn" id="clear-gemini" title="Clear key" aria-label="Clear Gemini key">✕</button>
+            </div>
+            <div class="row wrap">
+              <button class="btn ghost sm" id="save-gemini">Save</button>
+              <button class="btn ghost sm" id="disc-gemini">Discover</button>
+              <button class="btn ghost sm" id="test-gemini">Test</button>
+              <button class="btn ghost sm" id="cancel-gemini" hidden>Cancel</button>
+            </div>
+            <div class="status" id="st-gemini"></div>
           </div>
-          <p class="hint">The chat sees your current paper as context. Use <b>Apply</b> on a reply to drop it straight into the paper.</p>
+        </div>
+        <div class="ai-grid">
+          <div><label id="lblModel">Model</label><div class="dd" id="ddModel">
+            <button class="dd-btn" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="lblModel"><span class="dd-val">gemini-3.8-flash</span><svg class="dd-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button>
+            <div class="dd-menu" role="listbox" aria-labelledby="lblModel" hidden></div>
+          </div></div>
+        </div>
+        <div class="served" id="servedBy" hidden></div>
+        <div class="ai-grid">
+          <label>Subject<input id="fSubject" value="Mathematics" /></label>
+          <label>Class<input id="fClass" value="Class 10" /></label>
+          <label>Marks<input id="fMarks" value="50" /></label>
+          <label>Time<input id="fTime" value="2 hours" /></label>
+        </div>
+        <label>Topics<textarea id="fTopics" rows="2">Quadratic equations, Trigonometry, Probability</textarea></label>
+        <button id="btnGenerate" class="btn primary morph wide"><span id="genLabel">Generate with AI</span></button>
+        <div id="aiStatus" class="status"></div>
+
+        <div class="chat-ai">
+          <button id="chatToggle" class="exp-toggle" aria-expanded="false" aria-controls="chatRegion">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            Chat with AI about the paper
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div id="chatRegion" class="exp-body" hidden>
+            <div id="chatLog" class="chat-log"></div>
+            <div class="row">
+              <input id="chatInput" placeholder="e.g. Rewrite Q4 to be harder — or ask anything about the paper" autocomplete="off" />
+              <button id="btnChatSend" class="btn primary sm" title="Send (Enter)">Send</button>
+              <button id="btnChatClear" class="btn ghost sm" title="Clear the conversation">Clear</button>
+            </div>
+            <p class="hint">The chat sees your current paper as context. Use <b>Apply</b> on a reply to drop it straight into the paper.</p>
+          </div>
+        </div>
+
+        <div class="photo-ai">
+          <button id="photoToggle" class="exp-toggle" aria-expanded="false" aria-controls="photoRegion">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            Photo to AI
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div id="photoRegion" class="exp-body" hidden>
+          <div class="row">
+            <button id="btnCamera" class="btn ghost sm">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            Take photo</button>
+            <button id="btnUpload" class="btn ghost sm">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Upload</button>
+            <input type="file" id="fileImg" accept="image/*" hidden />
+          </div>
+          <div id="imgPrevWrap" class="img-prev" hidden><img id="imgPrev" alt="attached photo" /><button id="imgClear" class="mini-x" title="Remove photo" aria-label="Remove photo">✕</button></div>
+          <label>Ask about the photo<input id="imgQ" placeholder="e.g. Extract all questions as Markdown with $LaTeX$" /></label>
+          <button id="btnAskImg" class="btn primary morph wide">Ask AI about photo</button>
+          <div id="imgAns" class="img-ans" hidden></div>
+          </div>
         </div>
       </div>
-      <button id="btnGenerate" class="btn primary morph wide"><span id="genLabel">Generate with AI</span></button>
-      <div id="aiStatus" class="status"></div>
-    </div>
+    </details>
 
-    <div class="tabpage" id="page-style">
-      <label>School<input id="sSchool" value="Sunrise Public School" /></label>
-      <label>Exam title<input id="sTitle" value="Term Examination" /></label>
-      <label>Subject line<input id="sSub" value="Mathematics — Class 10" /></label>
-      <label>Meta<input id="sMeta" value="Time: 2 Hours  |  Max. Marks: 50" /></label>
-      <label>Instructions<textarea id="sInstr" rows="3">1. All questions are compulsory. 2. Show all steps clearly. 3. Write neatly and legibly.</textarea></label>
-      <div class="row wrap">
-        <button id="btnLogo" class="btn ghost sm" title="Add your school logo to the header">School logo ↑</button>
-        <button id="btnLogoClear" class="btn ghost sm" hidden>Remove logo</button>
+    <details class="step" open>
+      <summary>
+        <span class="step-n">2</span>
+        <span class="step-t">Paper setup<small>School · Header · Footer · Font · Margins</small></span>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </summary>
+      <div class="step-body">
+        <label>School<input id="sSchool" value="Sunrise Public School" /></label>
+        <label>Exam title<input id="sTitle" value="Term Examination" /></label>
+        <label>Subject line<input id="sSub" value="Mathematics — Class 10" /></label>
+        <label>Meta<input id="sMeta" value="Time: 2 Hours  |  Max. Marks: 50" /></label>
+        <label>Instructions<textarea id="sInstr" rows="3">1. All questions are compulsory. 2. Show all steps clearly. 3. Write neatly and legibly.</textarea></label>
+        <div class="row wrap">
+          <button id="btnLogo" class="btn ghost sm" title="Add your school logo to the header">School logo ↑</button>
+          <button id="btnLogoClear" class="btn ghost sm" hidden>Remove logo</button>
+        </div>
+        <input type="file" id="fileLogo" accept="image/*" hidden />
+        <div class="checks">
+          <label class="switch"><input type="checkbox" id="cMeta" checked /><span></span>Details line</label>
+          <label class="switch"><input type="checkbox" id="cInstrBox" checked /><span></span>Instructions box</label>
+        </div>
+        <label>Footer left<input id="fFoot" placeholder="e.g. Mathematics — Class 10" /></label>
+        <div class="checks">
+          <label class="switch"><input type="checkbox" id="cPageNum" checked /><span></span>Page number</label>
+        </div>
+        <div><label id="lblFont">Document font</label><div class="dd" id="ddFont">
+          <button class="dd-btn" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="lblFont"><span class="dd-val">Georgia + Poppins</span><svg class="dd-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button>
+          <div class="dd-menu" role="listbox" aria-labelledby="lblFont" hidden></div>
+        </div></div>
+        <div><label id="lblMargin">Page margins</label><div class="dd" id="ddMargin">
+          <button class="dd-btn" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="lblMargin"><span class="dd-val">Normal (1")</span><svg class="dd-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button>
+          <div class="dd-menu" role="listbox" aria-labelledby="lblMargin" hidden></div>
+        </div></div>
+        <label id="marginCustomWrap" hidden>Custom margin, inches (all sides)<input id="fMargin" type="number" min="0.25" max="2" step="0.05" value="1" /></label>
+        <div class="checks">
+          <label class="switch"><input type="checkbox" id="cHeader" checked /><span></span>Header</label>
+          <label class="switch"><input type="checkbox" id="cNativeMath" checked /><span></span>Native Word equations</label>
+        </div>
+        <p class="hint" id="mathNote">Full conversion: fractions, roots, scripts, ∑ ∫ lim, matrices, cases, align, accents — all native Word equations. PDF downloads directly; Print is under More.</p>
       </div>
-      <input type="file" id="fileLogo" accept="image/*" hidden />
-      <div class="checks">
-        <label class="switch"><input type="checkbox" id="cMeta" checked /><span></span>Details line</label>
-        <label class="switch"><input type="checkbox" id="cInstrBox" checked /><span></span>Instructions box</label>
-      </div>
-      <label>Footer left<input id="fFoot" placeholder="e.g. Mathematics — Class 10" /></label>
-      <div class="checks">
-        <label class="switch"><input type="checkbox" id="cPageNum" checked /><span></span>Page number</label>
-      </div>
-      <div><label id="lblFont">Document font</label><div class="dd" id="ddFont">
-        <button class="dd-btn" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="lblFont"><span class="dd-val">Georgia + Poppins</span><svg class="dd-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button>
-        <div class="dd-menu" role="listbox" aria-labelledby="lblFont" hidden></div>
-      </div></div>
-      <div><label id="lblMargin">Page margins</label><div class="dd" id="ddMargin">
-        <button class="dd-btn" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="lblMargin"><span class="dd-val">Normal (1")</span><svg class="dd-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button>
-        <div class="dd-menu" role="listbox" aria-labelledby="lblMargin" hidden></div>
-      </div></div>
-      <label id="marginCustomWrap" hidden>Custom margin, inches (all sides)<input id="fMargin" type="number" min="0.25" max="2" step="0.05" value="1" /></label>
-      <div class="checks">
-        <label class="switch"><input type="checkbox" id="cHeader" checked /><span></span>Header</label>
-        <label class="switch"><input type="checkbox" id="cNativeMath" checked /><span></span>Native Word equations</label>
-      </div>
-      <p class="hint" id="mathNote">Full conversion: fractions, roots, scripts, ∑ ∫ lim, matrices, cases, align, accents — all native Word equations. PDF downloads directly; Print is under More.</p>
-    </div>
+    </details>
+
+    <p class="step-note"><b>3</b>Click the page on the right to read or edit it — <b>4</b>download from the toolbar (Word, PDF, More).</p>
   </section>
 
   <section class="preview-wrap" id="previewWrap">
@@ -186,6 +205,7 @@
         <button class="tbtn" id="zoomIn" aria-label="Zoom in" title="Zoom in">A+</button>
         <button class="tbtn" id="btnFull" aria-label="Fullscreen preview" aria-pressed="false" title="Fullscreen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg></button>
         <button class="tbtn" id="btnFocus" aria-label="Focus paper, hide sidebar" aria-pressed="false" title="Focus paper"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg></button>
+        <span class="page-chip" id="pageChip" title="Paper size and length">A4 · 1 page</span>
       </div>
       <div class="tb-group fmt">
         <button class="tbtn fmtB" data-cmd="bold" title="Bold" aria-label="Bold"><b>B</b></button>
@@ -225,13 +245,13 @@
         <div class="paper-body" id="paperBody" contenteditable="true" spellcheck="false">
           <div class="empty"><div class="empty-icon">✦</div><p>Paste AI text → Clean & Preview — then click here to edit</p></div>
         </div>
-        <div class="paper-foot" id="paperFoot"><span id="pFootL">Beepin Docx</span><span id="pFootR">Page 1</span></div>
+        <div class="paper-foot" id="paperFoot"><span id="pFootL"></span><span id="pFootR">Page 1</span></div>
       </article>
     </div>
   </section>
 </main>
 
-<footer class="foot">Beepin Docx · by <a href="https://github.com/Bipin223" target="_blank" rel="noopener">Bipin Rizal</a> · <span id="statWords">0 words</span></footer>
+<footer class="foot">Docxzal · by <a href="https://github.com/Bipin223" target="_blank" rel="noopener">Bipin Rizal</a> · <span id="statWords">0 words</span></footer>
 
 <div class="modal-back" id="authorModal">
   <div class="modal glass pop-in">
@@ -239,7 +259,7 @@
     <div class="photo-wrap"><img src="author.jpg" alt="Bipin Rizal" class="author-photo" onerror="this.style.display='none';document.getElementById('authorFallback').style.display='grid'" /></div>
     <div class="author-fallback" id="authorFallback">BR</div>
     <h3>Bipin Rizal</h3>
-    <p>Author of Beepin Docx</p>
+    <p>Author of Docxzal</p>
     <a class="btn primary sm" href="https://github.com/Bipin223" target="_blank" rel="noopener">github.com/Bipin223</a>
   </div>
 </div>
@@ -258,6 +278,6 @@
 </div>
 
 <div class="toast" id="toast"></div>
-<script src="app.js?v=31"></script>
+<script src="app.js?v=33"></script>
 </body>
 </html>

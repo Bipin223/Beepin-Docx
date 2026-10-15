@@ -1,4 +1,4 @@
-/* Beepin Docx — paste/AI → clean preview → .docx (native OMML) + PDF */
+/* Docxzal — paste/AI → clean preview → .docx (native OMML) + PDF */
 const $ = (s) => document.querySelector(s) || NULL_EL;
 /* Null-object: a missing element degrades to a no-op instead of killing the script */
 const NULL_EL = new Proxy(function () {}, {
@@ -129,14 +129,19 @@ function setTheme(n, ev) {
 })();
 $("#themeToggle").addEventListener("click", (e) => setTheme(themeMode() === "day" ? NIGHT_OF[themeFamily()] : DAY_OF[themeFamily()], e));
 
-/* ---------- Tabs ---------- */
-const tabs = [...document.querySelectorAll(".tab")];
-tabs.forEach((b) => b.onclick = () => {
-  tabs.forEach(x => { x.classList.remove("active"); x.setAttribute("aria-selected", "false"); });
-  b.classList.add("active"); b.setAttribute("aria-selected", "true");
-  document.querySelectorAll(".tabpage").forEach(p => p.classList.remove("show"));
-  $("#page-" + b.dataset.tab).classList.add("show");
-});
+/* Sidebar is now one ordered column; these reveal the result instead of switching tabs */
+function revealPreview() {
+  const el = document.querySelector("#paper");
+  if (el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+function updatePageChip() {
+  const chip = document.getElementById("pageChip"), paper = $("#paper");
+  if (!chip || !paper) return;
+  const scale = (typeof currentEff === "number" && currentEff > 0.05) ? currentEff : 1;
+  const layoutH = (paper.getBoundingClientRect().height || 1123) / scale; // rect is zoom-scaled
+  const pages = Math.max(1, Math.ceil(layoutH / 1123 - 0.01));
+  chip.textContent = "A4 · " + pages + " page" + (pages > 1 ? "s" : "");
+}
 
 /* ---------- Author modal ---------- */
 const modal = $("#authorModal"), modalCard = modal.querySelector(".modal");
@@ -519,6 +524,7 @@ function render() {
       { left: "\\(", right: "\\)", display: false }, { left: "\\[", right: "\\]", display: true }
     ], throwOnError: false });
   } catch {}
+  updatePageChip();
   toast("Preview updated — click the paper to edit it");
 }
 $("#btnClean").onclick = render;
@@ -573,7 +579,7 @@ $("#paperBody").addEventListener("paste", e => {
 });
 
 /* ---------- Zoom ---------- */
-let zoom = 90, fitZoom = 1;
+let zoom = 90, fitZoom = 1, currentEff = 1;
 function computeFit() {
   const scroller = document.querySelector(".paper-scroll");
   const avail = scroller ? scroller.clientWidth - 4 : 794;
@@ -582,10 +588,12 @@ function computeFit() {
 function applyZoom() {
   computeFit();
   const eff = Math.max(0.2, Math.min(1.6, (zoom / 100) * fitZoom));
+  currentEff = eff;
   $("#zoomLbl").textContent = zoom + "%";
   const paper = $("#paper");
   if ("zoom" in paper.style) { paper.style.zoom = eff; paper.style.transform = ""; } // reflows layout
   else paper.style.transform = `scale(${eff})`; // fallback
+  updatePageChip();
 }
 window.addEventListener("resize", applyZoom);
 $("#zoomIn").onclick = () => { zoom = Math.min(140, zoom + 10); applyZoom(); };
@@ -593,7 +601,7 @@ $("#zoomOut").onclick = () => { zoom = Math.max(60, zoom - 10); applyZoom(); };
 applyZoom();
 
 /* ---------- PDF (direct download, no print dialog) ---------- */
-document.title = "beepin-paper";
+
 $("#btnPdf").onclick = async () => {
   const paper = $("#paper");
   if (!paper || !$("#paperBody").textContent.trim()) { toast("Nothing to export yet"); return; }
@@ -605,13 +613,13 @@ $("#btnPdf").onclick = async () => {
   try {
     await html2pdf().set({
       margin: 0,
-      filename: "beepin-paper.pdf",
+      filename: "docxzal-paper.pdf",
       image: { type: "jpeg", quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff", logging: false },
       jsPDF: { unit: "px", format: [794, 1123], orientation: "portrait", hotfixes: ["px_scaling"] },
       pagebreak: { mode: ["css", "legacy"] }
     }).from(paper).save();
-    toast("Downloaded beepin-paper.pdf");
+    toast("Downloaded docxzal-paper.pdf");
   } catch (e) { console.error(e); toast("PDF failed — use More → Print instead"); }
   finally {
     paper.style.zoom = oldZoom; paper.style.transform = oldTf;
@@ -632,7 +640,8 @@ document.addEventListener("click", (e) => { if (!exportMenu.hidden && !ddExport.
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !exportMenu.hidden) { closeExportMenu(); btnMore.focus(); } });
 exportMenu.querySelectorAll(".menu-item").forEach(b => b.addEventListener("click", () => {
   closeExportMenu();
-  ({ print: () => window.print(), doc: exportDoc, pptx: exportPptx, md: exportMd, html: exportHtml })[b.dataset.fmt]();
+  ({ print: () => { const t0 = document.title; document.title = "docxzal-paper"; window.print(); setTimeout(() => { document.title = t0; }, 600); },
+     doc: exportDoc, pptx: exportPptx, md: exportMd, html: exportHtml })[b.dataset.fmt]();
 }));
 
 /* ---------- AI Generate ---------- */
@@ -929,7 +938,7 @@ $("#btnGenerate").onclick = async () => {
       { role: "user", content: buildPrompt() }
     ], maxTokens: 8192, timeout: 120000 }); // thinking models need a big budget + time
     if (!j.text.trim()) throw new Error("Empty response — try again.");
-    $("#rawInput").value = structurePaper(j.text); syncCount(); render(); tabs[0].click();
+    $("#rawInput").value = structurePaper(j.text); syncCount(); render(); revealPreview();
     servedLine(j);
     st.className = "status ok"; st.textContent = "Done.";
   } catch (e) { st.className = "status err"; st.textContent = e.message + (e.code ? ` [${e.code}]` : ""); }
@@ -1528,8 +1537,8 @@ async function exportDocx() {
     const M = marginTwips(); // preview padding and Word margins are the same inches
     const doc = new docx.Document({ sections: [{ children: kids, properties: { page: { margin: { top: M, bottom: M, left: M, right: M } } }, footers: { default: foot } }] });
     const blob = await docx.Packer.toBlob(doc);
-    saveAs(blob, "beepin-paper.docx");
-    toast("Downloaded beepin-paper.docx");
+    saveAs(blob, "docxzal-paper.docx");
+    toast("Downloaded docxzal-paper.docx");
   } catch (e) { console.error(e); toast("Export failed — trying .doc"); exportDoc(); }
 }
 function exportDoc() {
@@ -1538,8 +1547,8 @@ function exportDoc() {
     body{font-family:${f.bodyCss};font-size:12pt}h1,h2{font-family:${f.headCss};text-align:center}table{border-collapse:collapse;width:100%}th,td{border:1.5pt solid #000;padding:6px}th{background:#EDE9FE}pre{background:#F1F5F9;padding:10px}</style></head><body>
     <h1>${$("#sSchool").value}</h1><p style="text-align:center">${$("#sTitle").value} — ${$("#sSub").value} • ${$("#sMeta").value}</p><hr/>
     ${$("#paperBody").innerHTML}</body></html>`;
-  saveAs(new Blob(["\ufeff", html], { type: "application/msword" }), "beepin-paper.doc");
-  toast("Downloaded beepin-paper.doc");
+  saveAs(new Blob(["\ufeff", html], { type: "application/msword" }), "docxzal-paper.doc");
+  toast("Downloaded docxzal-paper.doc");
 }
 /* ---------- Focus mode: hide sidebar, full paper ---------- */
 (function initFocus() {
@@ -1572,15 +1581,15 @@ document.addEventListener("fullscreenchange", () => {
 function exportMd() {
   const src = $("#rawInput").value.trim() || $("#paperBody").innerText.trim();
   if (!src) { toast("Nothing to export yet"); return; }
-  saveAs(new Blob([src], { type: "text/markdown" }), "beepin-paper.md");
-  toast("Downloaded beepin-paper.md");
+  saveAs(new Blob([src], { type: "text/markdown" }), "docxzal-paper.md");
+  toast("Downloaded docxzal-paper.md");
 }
 function exportHtml() {
   const body = $("#paperBody");
   if (!body || !body.textContent.trim()) { toast("Nothing to export yet"); return; }
   const H = id => (((document.getElementById(id) || {}).textContent) || "").trim();
   const f = docFonts();
-  const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>beepin-paper</title>` +
+  const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>docxzal-paper</title>` +
     `<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">` +
     `<style>body{font-family:${f.bodyCss};max-width:800px;margin:40px auto;padding:0 20px;color:#111;line-height:1.7}` +
     `h1,h2{font-family:${f.headCss}}` +
@@ -1589,8 +1598,8 @@ function exportHtml() {
     `blockquote{border-left:3px solid #b26a2b;background:#faf6ee;padding:6px 12px;margin:10px 0}</style></head><body>` +
     `<h1>${H("pSchool")}</h1><h2 style="text-align:center">${H("pTitle")}</h2>` +
     `<p style="text-align:center">${H("pMeta")}</p><hr><p>${H("pInstr")}</p>${body.innerHTML}</body></html>`;
-  saveAs(new Blob([html], { type: "text/html" }), "beepin-paper.html");
-  toast("Downloaded beepin-paper.html");
+  saveAs(new Blob([html], { type: "text/html" }), "docxzal-paper.html");
+  toast("Downloaded docxzal-paper.html");
 }
 
 /* ---------- PowerPoint export (slides; math as readable Unicode) ---------- */
@@ -1652,8 +1661,8 @@ async function exportPptx() {
         y += h + 0.1;
       }
     });
-    await pptx.writeFile({ fileName: "beepin-paper.pptx" });
-    toast("Downloaded beepin-paper.pptx");
+    await pptx.writeFile({ fileName: "docxzal-paper.pptx" });
+    toast("Downloaded docxzal-paper.pptx");
   } catch (e) { console.error(e); toast("PPTX failed"); }
 }
 
@@ -1773,7 +1782,7 @@ $("#btnAskImg").onclick = async () => {
     const use = document.createElement("button");
     use.className = "btn primary sm";
     use.textContent = "Send to editor";
-    use.onclick = () => { $("#rawInput").value = answer; syncCount(); render(); tabs[0].click(); toast("Sent to editor — review, then export"); };
+    use.onclick = () => { $("#rawInput").value = answer; syncCount(); render(); revealPreview(); toast("Sent to editor — review, then export"); };
     row.appendChild(use);
     box.append(pre, row);
   } catch (e) { box.innerHTML = "<p class='status err'>" + e.message + (e.code ? ` [${e.code}]` : "") + "</p>"; }
@@ -1813,7 +1822,7 @@ function chatBubble(role, text, opts = {}) {
 }
 function chatSystemPrompt() {
   const paper = chatPaperText();
-  return "You are helping improve a school question paper inside the Beepin Docx app. " +
+  return "You are helping improve a school question paper inside the Docxzal app. " +
     "Answer the user's request directly and concisely. When the user asks you to rewrite, fix, add, or regenerate paper content, " +
     "reply with the COMPLETE updated paper in clean Markdown only (headings, questions as Q1. ... [N marks], math in $...$ / $$...$$ LaTeX) " +
     "and no commentary, so it can be dropped straight into the editor. Clean markdown only — no preamble, no code fences around the whole paper." +
@@ -1846,13 +1855,13 @@ function sendChat() {
     chatBubble("assistant", answer, {
       actions: [
         { label: "Apply to paper", primary: true, fn: () => {
-            $("#rawInput").value = stripPaperFences(answer); syncCount(); render(); tabs[0].click();
+            $("#rawInput").value = stripPaperFences(answer); syncCount(); render(); revealPreview();
             toast("Applied to the paper — review, then export");
           } },
         { label: "Insert as question", fn: () => {
             const add = "\n\n" + stripPaperFences(answer);
             const cur = $("#rawInput").value.replace(/\s+$/, "");
-            $("#rawInput").value = (cur ? cur + add : add.trim()); syncCount(); render(); tabs[0].click();
+            $("#rawInput").value = (cur ? cur + add : add.trim()); syncCount(); render(); revealPreview();
             toast("Appended to the paper");
           } },
         { label: "Copy", fn: () => { navigator.clipboard.writeText(answer).then(() => toast("Copied"), () => toast("Copy failed")); } }

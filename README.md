@@ -1,4 +1,4 @@
-# Beepin Docx — AI Question Paper → Clean Word + PDF
+# Docxzal — AI Question Paper → Clean Word + PDF
 
 **Design:** warm minimalist caffeine theme — borderless tonal surfaces, Poppins, Lucide outline icons, gradient separators. Light/dark toggle uses a circular View-Transitions reveal; tabs use center-out underlines + hover wave; provider/model are custom tonal dropdowns with glass menus; Photo-to-AI is an expandable section.
 

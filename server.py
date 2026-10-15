@@ -241,7 +241,7 @@ class Handler(SimpleHTTPRequestHandler):
 
 if __name__ == "__main__":
     srv = ThreadingHTTPServer(("127.0.0.1", 8000), partial(Handler, directory=BASE))
-    print("Beepin Docx on http://localhost:8000  (keys: memory only, never logged)")
+    print("Docxzal on http://localhost:8000  (keys: memory only, never logged)")
     try:
         srv.serve_forever()
     except KeyboardInterrupt:
