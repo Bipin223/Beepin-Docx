@@ -163,6 +163,61 @@ $("#authorClose").onclick = closeAuthor;
 modal.onclick = (e) => { if (e.target === modal) closeAuthor(); };
 document.addEventListener("keydown", e => { if (e.key === "Escape" && modal.classList.contains("show")) closeAuthor(); });
 
+/* ---------- Author card: photo + live GitHub info + social icons ---------- */
+const GH_USER = "Bipin223";
+const GH_EXTRA = { linkedin: "", twitter: "", email: "" }; // fill these to reveal the extra icons
+const SOC_ICONS = {
+  github: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>',
+  globe: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>',
+  x: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.9 2H22l-6.8 7.8L23.2 22h-6.3l-4.9-6.4L6.4 22H3.3l7.3-8.3L1.2 2h6.4l4.4 5.9L18.9 2zm-1.1 18.1h1.7L6.9 3.8H5.1l12.7 16.3z"/></svg>',
+  mail: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>',
+  linkedin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-4 0v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>'
+};
+const attrEsc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+let ghProfile = null;
+(async function loadAuthor() {
+  const byId = id => document.getElementById(id);
+  const img = byId("authorPhoto"), fb = byId("authorFallback");
+  if (img) img.addEventListener("error", () => { // author.jpg → GitHub avatar → initials
+    if (ghProfile && ghProfile.avatar_url && !img.dataset.ghTried) { img.dataset.ghTried = "1"; img.src = ghProfile.avatar_url; return; }
+    img.style.display = "none";
+    if (fb) { fb.textContent = (ghProfile && ghProfile.name ? ghProfile.name : "BR").split(/\s+/).map(w => w[0] || "").join("").slice(0, 2).toUpperCase(); fb.style.display = "grid"; }
+  });
+  try {
+    let cached = null;
+    try { const c = JSON.parse(localStorage.getItem("bd_ghp") || "null"); cached = (c && Date.now() - c.t < 864e5) ? c.v : null; } catch {}
+    if (!cached) {
+      const r = await fetch("https://api.github.com/users/" + GH_USER);
+      if (r.ok) { cached = await r.json(); try { localStorage.setItem("bd_ghp", JSON.stringify({ t: Date.now(), v: cached })); } catch {} }
+    }
+    ghProfile = cached;
+  } catch {}
+  const p = ghProfile || {};
+  const set = (id, txt) => { const el = byId(id); if (el && txt) el.textContent = txt; };
+  set("authorName", p.name || "Bipin Rizal");
+  set("authorHandle", p.login ? "@" + p.login : "@" + GH_USER);
+  set("authorBio", p.bio || "Author of Docxzal — turns messy AI text into clean Word question papers with native equations.");
+  const chips = [];
+  if (p.location) chips.push(p.location);
+  if (typeof p.public_repos === "number") chips.push(p.public_repos + " public repos");
+  if (typeof p.followers === "number" && p.followers > 0) chips.push(p.followers + " followers");
+  const meta = byId("authorMeta");
+  if (meta && chips.length) meta.innerHTML = chips.map(c => "<span>" + attrEsc(c) + "</span>").join("");
+  const ghBtn = byId("authorGithub");
+  if (ghBtn && p.html_url) ghBtn.href = p.html_url;
+  const links = [{ href: p.html_url || ("https://github.com/" + GH_USER), title: "GitHub", svg: SOC_ICONS.github }];
+  const blog = (p.blog || "").trim();
+  if (blog) links.push({ href: /^https?:/i.test(blog) ? blog : "https://" + blog, title: blog, svg: SOC_ICONS.globe });
+  const tw = (p.twitter_username || GH_EXTRA.twitter || "").trim();
+  if (tw) links.push({ href: "https://x.com/" + tw.replace(/^@/, ""), title: "@" + tw.replace(/^@/, "") + " on X", svg: SOC_ICONS.x });
+  const mail = (p.email || GH_EXTRA.email || "").trim();
+  if (mail) links.push({ href: "mailto:" + mail, title: mail, svg: SOC_ICONS.mail });
+  if (GH_EXTRA.linkedin) links.push({ href: "https://www.linkedin.com/in/" + GH_EXTRA.linkedin.replace(/^\/+/, ""), title: "LinkedIn", svg: SOC_ICONS.linkedin });
+  const row = byId("socRow");
+  if (row) row.innerHTML = links.map(l =>
+    '<a class="soc" href="' + attrEsc(l.href) + '" title="' + attrEsc(l.title) + '" target="_blank" rel="noopener" aria-label="' + attrEsc(l.title) + '">' + l.svg + "</a>").join("");
+})();
+
 /* ---------- Sample (shows full coverage) ---------- */
 const SAMPLE = `## Section A — Short Answers (2 marks each)
 

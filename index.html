@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
-<link rel="stylesheet" href="styles.css?v=37" />
+<link rel="stylesheet" href="styles.css?v=38" />
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
@@ -251,13 +251,18 @@
 <footer class="foot">Docxzal · by <a href="https://github.com/Bipin223" target="_blank" rel="noopener">Bipin Rizal</a> · <span id="statWords">0 words</span></footer>
 
 <div class="modal-back" id="authorModal">
-  <div class="modal glass pop-in">
+  <div class="modal glass pop-in author-card">
     <button class="modal-x icon-btn" id="authorClose" aria-label="Close">✕</button>
-    <div class="photo-wrap"><img src="author.jpg" alt="Bipin Rizal" class="author-photo" onerror="this.style.display='none';document.getElementById('authorFallback').style.display='grid'" /></div>
-    <div class="author-fallback" id="authorFallback">BR</div>
-    <h3>Bipin Rizal</h3>
-    <p>Author of Docxzal</p>
-    <a class="btn primary sm" href="https://github.com/Bipin223" target="_blank" rel="noopener">github.com/Bipin223</a>
+    <div class="photo-wrap">
+      <img src="author.jpg" alt="Bipin Rizal" class="author-photo" id="authorPhoto" />
+      <span class="author-fallback" id="authorFallback" aria-hidden="true">BR</span>
+    </div>
+    <h3 id="authorName">Bipin Rizal</h3>
+    <div class="author-handle" id="authorHandle">@Bipin223</div>
+    <p class="author-bio" id="authorBio">Author of Docxzal — turns messy AI text into clean Word question papers with native equations.</p>
+    <div class="author-meta" id="authorMeta"></div>
+    <div class="soc-row" id="socRow"></div>
+    <a class="btn primary sm" id="authorGithub" href="https://github.com/Bipin223" target="_blank" rel="noopener">GitHub profile</a>
   </div>
 </div>
 
@@ -275,6 +280,6 @@
 </div>
 
 <div class="toast" id="toast"></div>
-<script src="app.js?v=37"></script>
+<script src="app.js?v=38"></script>
 </body>
 </html>
