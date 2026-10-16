@@ -1021,6 +1021,25 @@ makeDropdown("ddHSize", {
 });
 applyHeadScale();
 
+/* ---------- body text size scale: preview and Word share the same factor ---------- */
+const B_SCALES = { small: { label: "Small", k: 0.9 }, normal: { label: "Normal", k: 1 }, large: { label: "Large", k: 1.1 }, xl: { label: "Extra large", k: 1.2 } };
+let bScaleKey = "normal";
+try { bScaleKey = localStorage.getItem("bd_bscale") || "normal"; } catch {}
+if (!B_SCALES[bScaleKey]) bScaleKey = "normal";
+const bScale = () => (B_SCALES[bScaleKey] || B_SCALES.normal).k;
+const BS = () => Math.round(23 * bScale()); // Word run size for body text (half-points)
+function applyBodyScale() {
+  const paper = $("#paper");
+  if (paper && paper.style) paper.style.setProperty("--bscale", String(bScale()));
+  try { localStorage.setItem("bd_bscale", bScaleKey); } catch {}
+}
+makeDropdown("ddBSize", {
+  options: Object.entries(B_SCALES).map(([value, s]) => ({ value, label: s.label })),
+  value: bScaleKey,
+  onChange: (v) => { if (B_SCALES[v]) { bScaleKey = v; applyBodyScale(); } }
+});
+applyBodyScale();
+
 /* ---------- page margins: presets + custom, preview and Word stay identical ---------- */
 const MARGIN_PRESETS = {
   narrow: { label: 'Narrow (0.5")', inch: 0.5 },
@@ -1634,10 +1653,10 @@ function mathKid(latex) {
     try { return new docx.Math({ children: latexToMathKids(latex) }); }
     catch { /* fall through to text */ }
   }
-  return new docx.TextRun({ text: latexFallbackText(latex), size: 23 });
+  return new docx.TextRun({ text: latexFallbackText(latex), size: BS() });
 }
 function runsFromNodes(nodes, st = {}) {
-  const size = st.size || 23;
+  const size = st.size || BS();
   const font = st.mono ? "Consolas" : (st.font || docFonts().bodyWord); // preview paper body — match it
   const color = st.mono ? "0f172a" : st.color;
   const out = [];
@@ -1736,14 +1755,14 @@ function blocksFromEl(el, wrap = {}) {
     return kids;
   }
   if (tag === "li") return [new docx.Paragraph({
-    children: [new docx.TextRun({ text: "•  ", size: 23, font: docFonts().bodyWord }), ...runsFromNode(el, { size: 23 })],
+    children: [new docx.TextRun({ text: "•  ", size: BS(), font: docFonts().bodyWord }), ...runsFromNode(el, { size: BS() })],
     spacing: { after: 150, ...LINE }, ...wrap
   })];
 
   /* ---- body paragraph (one Word paragraph per preview block) ---- */
   const q = el.classList && el.classList.contains("q");
   const para = (kids, spacing, over = {}) => new docx.Paragraph({
-    children: kids.length ? kids : [new docx.TextRun({ text: "", size: 23, font: docFonts().bodyWord })],
+    children: kids.length ? kids : [new docx.TextRun({ text: "", size: BS(), font: docFonts().bodyWord })],
     spacing: { ...LINE, ...spacing },
     tabStops,
     keepLines: q || undefined,
@@ -1753,7 +1772,7 @@ function blocksFromEl(el, wrap = {}) {
   const nodes = [...el.childNodes];
   const isDisp = n => n.nodeType === 1 && n.classList && n.classList.contains("math-src") && n.dataset.display;
 
-  if (!nodes.some(isDisp)) return [para(runsFromNodes(nodes, { size: 23 }), { after: q ? 180 : 225 })];
+  if (!nodes.some(isDisp)) return [para(runsFromNodes(nodes, { size: BS() }), { after: q ? 180 : 225 })];
 
   // a $$…$$ block becomes its own centered line, exactly like the preview renders it
   const kids = [];
@@ -1774,7 +1793,7 @@ function blocksFromEl(el, wrap = {}) {
       }
     }
     const sp = { ...spacing }; delete sp.trimEdges;
-    kids.push(para(runsFromNodes(out, { size: 23 }), sp, over));
+    kids.push(para(runsFromNodes(out, { size: BS() }), sp, over));
   };
   nodes.forEach(ch => {
     if (isDisp(ch)) {
@@ -1904,7 +1923,7 @@ function exportDoc() {
   const cols = pageCols === 2 ? "column-count:2;column-gap:48px" : "";
   const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><style>
     @page{size:A4 ${pageOrient};margin:${marginInch()}in}
-    body{font-family:${f.bodyCss};font-size:12pt}h1,h2{font-family:${f.headCss};text-align:center}h1{font-size:${(20 * hScale()).toFixed(1)}pt}h2{font-size:${(14 * hScale()).toFixed(1)}pt}table{border-collapse:collapse;width:100%}th,td{border:1.5pt solid #000;padding:6px}th{background:#EDE9FE}pre{background:#F1F5F9;padding:10px}.q-body{${cols}}</style></head><body>
+    body{font-family:${f.bodyCss};font-size:${(12 * bScale()).toFixed(1)}pt}h1,h2{font-family:${f.headCss};text-align:center}h1{font-size:${(20 * hScale()).toFixed(1)}pt}h2{font-size:${(14 * hScale()).toFixed(1)}pt}table{border-collapse:collapse;width:100%}th,td{border:1.5pt solid #000;padding:6px}th{background:#EDE9FE}pre{background:#F1F5F9;padding:10px}.q-body{${cols}}</style></head><body>
     <h1>${$("#sSchool").value}</h1><p style="text-align:center">${$("#sTitle").value} — ${$("#sSub").value} • ${$("#sMeta").value}</p><hr/>
     <div class="q-body">${$("#paperBody").innerHTML}</div>
     ${keyOn() ? '<div style="page-break-before:always"></div>' + $("#paperKey").innerHTML : ""}</body></html>`;
@@ -1953,7 +1972,7 @@ function exportHtml() {
   const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>docxzal-paper</title>` +
     `<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">` +
     `<style>@page{size:A4 ${pageOrient};margin:${marginInch()}in}` +
-    `body{font-family:${f.bodyCss};max-width:800px;margin:40px auto;padding:0 20px;color:#111;line-height:1.7;${pageCols === 2 ? "column-count:2;column-gap:48px;" : ""}}` +
+    `body{font-family:${f.bodyCss};font-size:${(16 * bScale()).toFixed(1)}px;max-width:800px;margin:40px auto;padding:0 20px;color:#111;line-height:1.7;${pageCols === 2 ? "column-count:2;column-gap:48px;" : ""}}` +
     `h1,h2{font-family:${f.headCss}}` +
     `h1{text-align:center;font-size:${(26 * hScale()).toFixed(1)}px}h2{font-size:${(16 * hScale()).toFixed(1)}px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #666;padding:6px}` +
     `pre{background:#22201c;color:#f0e9db;padding:12px;border-radius:8px;overflow:auto}` +

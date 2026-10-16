@@ -256,7 +256,7 @@ body.focus-paper .a4{max-width:100%}
 /* answer key page (Word/PDF get a real page break) */
 .page-break-marker{border-top:2px dashed var(--acc-soft);margin:30px 0 0;text-align:center;position:relative}
 .page-break-marker span{position:absolute;top:-11px;left:50%;transform:translateX(-50%);background:#faf6ee;color:#8c7861;font-size:11px;padding:2px 10px;border-radius:999px;font-family:Poppins,sans-serif}
-.paper-key{font-size:15px;line-height:1.75;margin-top:22px;break-before:page}
+.paper-key{font-size:calc(15px * var(--bscale,1));line-height:1.75;margin-top:22px;break-before:page}
 .paper-key h1,.paper-key h2{font-family:var(--doc-head,Poppins,sans-serif)}
 .paper-key[hidden]{display:none}
 .pdf-export .page-break-marker{display:none}
@@ -269,7 +269,7 @@ body.focus-paper .a4{max-width:100%}
 .prule{height:1px;background:linear-gradient(90deg,transparent,#9ca3af,transparent);margin:14px 0}
 .pinstr{font-size:13px;background:#f6f4ef;border-radius:8px;padding:10px 12px;color:#4b5563;white-space:pre-wrap}
 .paper-head{flex:none}
-.paper-body{font-size:15px;line-height:1.75;margin-top:14px;flex:1 0 auto}
+.paper-body{font-size:calc(15px * var(--bscale,1));line-height:1.75;margin-top:14px;flex:1 0 auto}
 .paper-body table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13.5px;font-family:var(--doc-head,Poppins,sans-serif)}
 .paper-body th,.paper-body td{border:1px solid #9ca3af;padding:7px 9px;text-align:left}
 .paper-body th{background:#f1ede4}
