@@ -1028,6 +1028,7 @@ try { bScaleKey = localStorage.getItem("bd_bscale") || "normal"; } catch {}
 if (!B_SCALES[bScaleKey]) bScaleKey = "normal";
 const bScale = () => (B_SCALES[bScaleKey] || B_SCALES.normal).k;
 const BS = () => Math.round(23 * bScale()); // Word run size for body text (half-points)
+const bsz = (half) => Math.round(half * bScale()); // small print (meta, instr, tables, marks, footer)
 function applyBodyScale() {
   const paper = $("#paper");
   if (paper && paper.style) paper.style.setProperty("--bscale", String(bScale()));
@@ -1678,8 +1679,8 @@ function runsFromNodes(nodes, st = {}) {
         // preview floats marks to the right margin → right tab stop + small grey text
         const t = ch.textContent.replace(/[\[\]]/g, "").trim();
         if (t) {
-          out.push(new docx.TextRun({ children: [new docx.Tab()], size: 20, font: docFonts().bodyWord }));
-          out.push(new docx.TextRun({ text: "[" + t + "]", size: 20, font: docFonts().bodyWord, color: "4b5563" }));
+          out.push(new docx.TextRun({ children: [new docx.Tab()], size: bsz(20), font: docFonts().bodyWord }));
+          out.push(new docx.TextRun({ text: "[" + t + "]", size: bsz(20), font: docFonts().bodyWord, color: "4b5563" }));
         }
       }
       else {
@@ -1731,7 +1732,7 @@ function blocksFromEl(el, wrap = {}) {
       children: [...tr.querySelectorAll("th,td")].map(td => {
         const isHead = td.tagName === "TH" || (ri === 0 && tr.querySelectorAll("th").length > 0);
         return new docx.TableCell({
-          children: [new docx.Paragraph({ children: runsFromNode(td, { size: 20, font: docFonts().headWord }), spacing: { line: 300, lineRule: docx.LineRuleType.AUTO } })],
+          children: [new docx.Paragraph({ children: runsFromNode(td, { size: bsz(20), font: docFonts().headWord }), spacing: { line: 300, lineRule: docx.LineRuleType.AUTO } })],
           ...(isHead ? { shading: { fill: "f1ede4" } } : {})
         });
       })
@@ -1743,7 +1744,7 @@ function blocksFromEl(el, wrap = {}) {
   }
   if (tag === "blockquote") {
     // preview: amber left bar on a warm paper tint
-    const bq = { shading: { fill: "faf6ee" }, border: { left: { style: docx.BorderStyle.SINGLE, size: 18, color: "b26a2b", space: 8 } } };
+    const bq = { shading: { fill: "faf6ee" }, border: { left: { style: docx.BorderStyle.SINGLE, size: bsz(18), color: "b26a2b", space: 8 } } };
     const inner = [...el.children].filter(c => /^(p|h\d|pre|ul|ol|div)$/i.test(c.tagName));
     const kids = [];
     (inner.length ? inner : [el]).forEach(b => blocksFromEl(b, { ...bq, ...wrap }).forEach(x => kids.push(x)));
@@ -1835,15 +1836,15 @@ async function exportDocx() {
       kids.push(new docx.Paragraph({ children: [new docx.TextRun({ text: H("pSchool") || $("#sSchool").value, bold: true, size: Math.round(52 * hScale()), font: docFonts().headWord })], alignment: C, spacing: { after: 80, ...L } }));      // preview h1
       kids.push(new docx.Paragraph({ children: [new docx.TextRun({ text: H("pTitle") || $("#sTitle").value, bold: true, size: Math.round(32 * hScale()), color: "4b5563", font: docFonts().headWord })], alignment: C, spacing: { after: 60, ...L } })); // preview h2
       const meta = (H("pMeta") || `${$("#sSub").value}  •  ${$("#sMeta").value}`).replace(/\s+/g, " ");
-      if ($("#cMeta").checked) kids.push(new docx.Paragraph({ children: [new docx.TextRun({ text: meta, size: 20, color: "6b7280", font: docFonts().bodyWord })], alignment: C, spacing: { after: 0, ...L } })); // preview .pmeta: 13px
+      if ($("#cMeta").checked) kids.push(new docx.Paragraph({ children: [new docx.TextRun({ text: meta, size: bsz(20), color: "6b7280", font: docFonts().bodyWord })], alignment: C, spacing: { after: 0, ...L } })); // preview .pmeta: 13px
       kids.push(new docx.Paragraph({ children: [new docx.TextRun({ text: "", size: 2 })], border: { bottom: { style: docx.BorderStyle.SINGLE, size: 6, color: "b9b3a5" } }, spacing: { before: 180, after: 180 } })); // preview .prule
       const instr = (H("pInstr") || $("#sInstr").value || "").replace(/\s+$/, "");
       if ($("#cInstrBox").checked && instr) { // preview .pinstr: 13px warm box
         const lines = instr.split("\n");
         const runs = [];
         lines.forEach((ln, k) => {
-          if (k) runs.push(new docx.TextRun({ text: "", size: 20, break: 1 }));
-          runs.push(new docx.TextRun({ text: ln, size: 20, color: "4b5563", font: docFonts().bodyWord }));
+          if (k) runs.push(new docx.TextRun({ text: "", size: bsz(20), break: 1 }));
+          runs.push(new docx.TextRun({ text: ln, size: bsz(20), color: "4b5563", font: docFonts().bodyWord }));
         });
         const box = { style: docx.BorderStyle.SINGLE, size: 4, color: "f6f4ef", space: 100 };
         kids.push(new docx.Paragraph({ children: runs, shading: { fill: "f6f4ef" },
@@ -1870,7 +1871,7 @@ async function exportDocx() {
     }
     // preview footer: thin rule, custom left text, optional page number right
     const footL = ($("#fFoot").value || "").trim(), showPg = $("#cPageNum").checked;
-    const HF = { font: docFonts().headWord, size: 18, color: "9ca3af" };
+    const HF = { font: docFonts().headWord, size: bsz(18), color: "9ca3af" };
     const footKids = [];
     if (footL) footKids.push(new docx.TextRun({ text: footL, ...HF }));
     if (showPg && footL) footKids.push(new docx.TextRun({ children: [new docx.Tab()], ...HF }));
@@ -1879,7 +1880,7 @@ async function exportDocx() {
       footKids.push(new docx.TextRun({ text: "Page ", ...HF }));
       footKids.push(new docx.TextRun({ children: [docx.PageNumber.CURRENT], ...HF }));
     }
-    if (!footKids.length) footKids.push(new docx.TextRun({ text: "", size: 18 }));
+    if (!footKids.length) footKids.push(new docx.TextRun({ text: "", size: bsz(18) }));
     const foot = new docx.Footer({ children: [new docx.Paragraph({
       tabStops: [{ type: docx.TabStopType.RIGHT, position: tabPosTwips() }],
       border: { top: { style: docx.BorderStyle.SINGLE, size: 4, color: "e5e0d4" } },

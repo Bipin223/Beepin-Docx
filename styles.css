@@ -263,14 +263,14 @@ body.focus-paper .a4{max-width:100%}
 .a4 h1{font-size:calc(26px * var(--hscale,1));text-align:center;margin:0;font-family:var(--doc-head,Poppins,sans-serif)}
 .a4 h2{text-align:center;font-size:calc(16px * var(--hscale,1));margin:6px 0;color:#4b5563;font-weight:600;font-family:var(--doc-head,Poppins,sans-serif)}
 .paper-body h3,.paper-key h3{font-size:calc(13.5px * var(--hscale,1));color:#4b5563;font-weight:600;font-family:var(--doc-head,Poppins,sans-serif)}
-.pmeta{text-align:center;font-size:13px;color:#6b7280;margin-top:6px}
+.pmeta{text-align:center;font-size:calc(13px * var(--bscale,1));color:#6b7280;margin-top:6px}
 #pLogo{display:block;margin:0 auto 8px;max-height:64px;max-width:220px}
 #pLogo[hidden]{display:none}
 .prule{height:1px;background:linear-gradient(90deg,transparent,#9ca3af,transparent);margin:14px 0}
-.pinstr{font-size:13px;background:#f6f4ef;border-radius:8px;padding:10px 12px;color:#4b5563;white-space:pre-wrap}
+.pinstr{font-size:calc(13px * var(--bscale,1));background:#f6f4ef;border-radius:8px;padding:10px 12px;color:#4b5563;white-space:pre-wrap}
 .paper-head{flex:none}
 .paper-body{font-size:calc(15px * var(--bscale,1));line-height:1.75;margin-top:14px;flex:1 0 auto}
-.paper-body table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13.5px;font-family:var(--doc-head,Poppins,sans-serif)}
+.paper-body table{width:100%;border-collapse:collapse;margin:12px 0;font-size:calc(13.5px * var(--bscale,1));font-family:var(--doc-head,Poppins,sans-serif)}
 .paper-body th,.paper-body td{border:1px solid #9ca3af;padding:7px 9px;text-align:left}
 .paper-body th{background:#f1ede4}
 .paper-body pre{background:#22201c;color:#f0e9db;border-radius:10px;padding:12px 14px;overflow:auto;font-size:12.8px;font-family:ui-monospace,Consolas,monospace}
@@ -279,7 +279,7 @@ body.focus-paper .a4{max-width:100%}
 .marks{float:right;color:#4b5563;font-size:.9em;margin-left:12px}
 .q{margin:12px 0;padding:8px 10px;border-radius:8px}
 .paper-body hr{border:none;border-top:1.5px solid #6b7280;margin:14px 0}
-.paper-foot{display:flex;justify-content:space-between;color:#9ca3af;font-size:12px;border-top:1px solid #e5e0d4;margin-top:26px;padding-top:10px;font-family:var(--doc-head,Poppins,sans-serif)}
+.paper-foot{display:flex;justify-content:space-between;color:#9ca3af;font-size:calc(12px * var(--bscale,1));border-top:1px solid #e5e0d4;margin-top:26px;padding-top:10px;font-family:var(--doc-head,Poppins,sans-serif)}
 /* direct-PDF capture: no shadow, keep blocks whole across pages */
 .pdf-export{box-shadow:none!important}
 .pdf-export table,.pdf-export pre,.pdf-export .q,.pdf-export h1,.pdf-export h2,.pdf-export h3,.pdf-export .paper-foot{break-inside:avoid;page-break-inside:avoid}
