@@ -1003,6 +1003,24 @@ makeDropdown("ddFont", {
 });
 applyDocFont();
 
+/* ---------- heading size scale: preview and Word share the same factor ---------- */
+const H_SCALES = { small: { label: "Small", k: 0.85 }, normal: { label: "Normal", k: 1 }, large: { label: "Large", k: 1.15 }, xl: { label: "Extra large", k: 1.3 } };
+let hScaleKey = "normal";
+try { hScaleKey = localStorage.getItem("bd_hscale") || "normal"; } catch {}
+if (!H_SCALES[hScaleKey]) hScaleKey = "normal";
+const hScale = () => (H_SCALES[hScaleKey] || H_SCALES.normal).k;
+function applyHeadScale() {
+  const paper = $("#paper");
+  if (paper && paper.style) paper.style.setProperty("--hscale", String(hScale()));
+  try { localStorage.setItem("bd_hscale", hScaleKey); } catch {}
+}
+makeDropdown("ddHSize", {
+  options: Object.entries(H_SCALES).map(([value, s]) => ({ value, label: s.label })),
+  value: hScaleKey,
+  onChange: (v) => { if (H_SCALES[v]) { hScaleKey = v; applyHeadScale(); } }
+});
+applyHeadScale();
+
 /* ---------- page margins: presets + custom, preview and Word stay identical ---------- */
 const MARGIN_PRESETS = {
   narrow: { label: 'Narrow (0.5")', inch: 0.5 },
@@ -1668,9 +1686,9 @@ function blocksFromEl(el, wrap = {}) {
 
   if (tag === "hr") return [new docx.Paragraph({ border: { bottom: { style: docx.BorderStyle.SINGLE, size: 12, color: "6b7280" } }, spacing: { before: 180, after: 180 } })];
   if (/^h[1-3]$/.test(tag)) {
-    const cfg = tag === "h1" ? { size: 52, center: true, color: "1f2937", lvl: docx.HeadingLevel.HEADING_1 }
-      : tag === "h2" ? { size: 32, center: true, color: "4b5563", lvl: docx.HeadingLevel.HEADING_2 }
-        : { size: 27, color: "4b5563", lvl: docx.HeadingLevel.HEADING_3 };
+    const cfg = tag === "h1" ? { size: Math.round(52 * hScale()), center: true, color: "1f2937", lvl: docx.HeadingLevel.HEADING_1 }
+      : tag === "h2" ? { size: Math.round(32 * hScale()), center: true, color: "4b5563", lvl: docx.HeadingLevel.HEADING_2 }
+        : { size: Math.round(27 * hScale()), color: "4b5563", lvl: docx.HeadingLevel.HEADING_3 };
     return [new docx.Paragraph({
       children: runsFromNode(el, { size: cfg.size, b: true, font: docFonts().headWord, color: cfg.color }),
       heading: cfg.lvl, // real Word heading style → round-trips through Import too
@@ -1795,8 +1813,8 @@ async function exportDocx() {
             children: [new docx.ImageRun({ data: buf, transformation: { width: w, height: 70 } })] }));
         } catch {}
       }
-      kids.push(new docx.Paragraph({ children: [new docx.TextRun({ text: H("pSchool") || $("#sSchool").value, bold: true, size: 52, font: docFonts().headWord })], alignment: C, spacing: { after: 80, ...L } }));      // preview h1: 26px
-      kids.push(new docx.Paragraph({ children: [new docx.TextRun({ text: H("pTitle") || $("#sTitle").value, bold: true, size: 32, color: "4b5563", font: docFonts().headWord })], alignment: C, spacing: { after: 60, ...L } })); // preview h2: 16px
+      kids.push(new docx.Paragraph({ children: [new docx.TextRun({ text: H("pSchool") || $("#sSchool").value, bold: true, size: Math.round(52 * hScale()), font: docFonts().headWord })], alignment: C, spacing: { after: 80, ...L } }));      // preview h1
+      kids.push(new docx.Paragraph({ children: [new docx.TextRun({ text: H("pTitle") || $("#sTitle").value, bold: true, size: Math.round(32 * hScale()), color: "4b5563", font: docFonts().headWord })], alignment: C, spacing: { after: 60, ...L } })); // preview h2
       const meta = (H("pMeta") || `${$("#sSub").value}  •  ${$("#sMeta").value}`).replace(/\s+/g, " ");
       if ($("#cMeta").checked) kids.push(new docx.Paragraph({ children: [new docx.TextRun({ text: meta, size: 20, color: "6b7280", font: docFonts().bodyWord })], alignment: C, spacing: { after: 0, ...L } })); // preview .pmeta: 13px
       kids.push(new docx.Paragraph({ children: [new docx.TextRun({ text: "", size: 2 })], border: { bottom: { style: docx.BorderStyle.SINGLE, size: 6, color: "b9b3a5" } }, spacing: { before: 180, after: 180 } })); // preview .prule
@@ -1886,7 +1904,7 @@ function exportDoc() {
   const cols = pageCols === 2 ? "column-count:2;column-gap:48px" : "";
   const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><style>
     @page{size:A4 ${pageOrient};margin:${marginInch()}in}
-    body{font-family:${f.bodyCss};font-size:12pt}h1,h2{font-family:${f.headCss};text-align:center}table{border-collapse:collapse;width:100%}th,td{border:1.5pt solid #000;padding:6px}th{background:#EDE9FE}pre{background:#F1F5F9;padding:10px}.q-body{${cols}}</style></head><body>
+    body{font-family:${f.bodyCss};font-size:12pt}h1,h2{font-family:${f.headCss};text-align:center}h1{font-size:${(20 * hScale()).toFixed(1)}pt}h2{font-size:${(14 * hScale()).toFixed(1)}pt}table{border-collapse:collapse;width:100%}th,td{border:1.5pt solid #000;padding:6px}th{background:#EDE9FE}pre{background:#F1F5F9;padding:10px}.q-body{${cols}}</style></head><body>
     <h1>${$("#sSchool").value}</h1><p style="text-align:center">${$("#sTitle").value} — ${$("#sSub").value} • ${$("#sMeta").value}</p><hr/>
     <div class="q-body">${$("#paperBody").innerHTML}</div>
     ${keyOn() ? '<div style="page-break-before:always"></div>' + $("#paperKey").innerHTML : ""}</body></html>`;
@@ -1937,7 +1955,7 @@ function exportHtml() {
     `<style>@page{size:A4 ${pageOrient};margin:${marginInch()}in}` +
     `body{font-family:${f.bodyCss};max-width:800px;margin:40px auto;padding:0 20px;color:#111;line-height:1.7;${pageCols === 2 ? "column-count:2;column-gap:48px;" : ""}}` +
     `h1,h2{font-family:${f.headCss}}` +
-    `h1{text-align:center}table{border-collapse:collapse;width:100%}th,td{border:1px solid #666;padding:6px}` +
+    `h1{text-align:center;font-size:${(26 * hScale()).toFixed(1)}px}h2{font-size:${(16 * hScale()).toFixed(1)}px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #666;padding:6px}` +
     `pre{background:#22201c;color:#f0e9db;padding:12px;border-radius:8px;overflow:auto}` +
     `blockquote{border-left:3px solid #b26a2b;background:#faf6ee;padding:6px 12px;margin:10px 0}</style></head><body>` +
     `<h1>${H("pSchool")}</h1><h2 style="text-align:center">${H("pTitle")}</h2>` +

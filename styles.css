@@ -260,8 +260,9 @@ body.focus-paper .a4{max-width:100%}
 .paper-key h1,.paper-key h2{font-family:var(--doc-head,Poppins,sans-serif)}
 .paper-key[hidden]{display:none}
 .pdf-export .page-break-marker{display:none}
-.a4 h1{font-size:26px;text-align:center;margin:0;font-family:var(--doc-head,Poppins,sans-serif)}
-.a4 h2{text-align:center;font-size:16px;margin:6px 0;color:#4b5563;font-weight:600;font-family:var(--doc-head,Poppins,sans-serif)}
+.a4 h1{font-size:calc(26px * var(--hscale,1));text-align:center;margin:0;font-family:var(--doc-head,Poppins,sans-serif)}
+.a4 h2{text-align:center;font-size:calc(16px * var(--hscale,1));margin:6px 0;color:#4b5563;font-weight:600;font-family:var(--doc-head,Poppins,sans-serif)}
+.paper-body h3,.paper-key h3{font-size:calc(13.5px * var(--hscale,1));color:#4b5563;font-weight:600;font-family:var(--doc-head,Poppins,sans-serif)}
 .pmeta{text-align:center;font-size:13px;color:#6b7280;margin-top:6px}
 #pLogo{display:block;margin:0 auto 8px;max-height:64px;max-width:220px}
 #pLogo[hidden]{display:none}
