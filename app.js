@@ -587,6 +587,8 @@ function render() {
       { left: "\\(", right: "\\)", display: false }, { left: "\\[", right: "\\]", display: true }
     ], throwOnError: false });
   } catch {}
+  renderKey();
+  histSnap(true);
   updatePageChip();
   toast("Preview updated — click the paper to edit it");
 }
@@ -640,6 +642,207 @@ $("#paperBody").addEventListener("paste", e => {
   const t = (e.clipboardData || window.clipboardData).getData("text/plain");
   document.execCommand("insertText", false, t);
 });
+
+/* ---------- Undo / redo for preview edits ---------- */
+const HIST = { snaps: [], i: -1, lock: false, timer: 0 };
+function histPaint() {
+  const u = $("#btnUndo"), r = $("#btnRedo");
+  if (u) u.disabled = HIST.i <= 0;
+  if (r) r.disabled = HIST.i >= HIST.snaps.length - 1;
+}
+function histSnap(force) {
+  if (HIST.lock) return;
+  const html = $("#paperBody").innerHTML;
+  if (!force && HIST.snaps[HIST.i] === html) return;
+  HIST.snaps.splice(HIST.i + 1); // drop any redo tail
+  HIST.snaps.push(html);
+  if (HIST.snaps.length > 60) { HIST.snaps.shift(); }
+  HIST.i = HIST.snaps.length - 1;
+  histPaint();
+}
+function histRestore(k) {
+  if (k < 0 || k >= HIST.snaps.length || k === HIST.i) return;
+  HIST.lock = true;
+  $("#paperBody").innerHTML = HIST.snaps[k];
+  HIST.i = k;
+  HIST.lock = false;
+  histPaint();
+}
+$("#btnUndo").onclick = () => histRestore(HIST.i - 1);
+$("#btnRedo").onclick = () => histRestore(HIST.i + 1);
+$("#paperBody").addEventListener("input", () => {
+  clearTimeout(HIST.timer);
+  HIST.timer = setTimeout(() => histSnap(), 450);
+});
+document.addEventListener("keydown", (e) => {
+  if (!(e.ctrlKey || e.metaKey)) return;
+  const k = e.key.toLowerCase();
+  if (k !== "z" && k !== "y") return;
+  const pb = document.querySelector("#paperBody");
+  if (!pb || (document.activeElement !== pb && !pb.contains(document.activeElement))) return;
+  e.preventDefault();
+  if (k === "z" && e.shiftKey) histRestore(HIST.i + 1);
+  else if (k === "z") histRestore(HIST.i - 1);
+  else histRestore(HIST.i + 1); // Ctrl+Y
+});
+
+/* ---------- Find & replace in the paper (math and marks stay intact) ---------- */
+function paperTextNodes() {
+  const out = [];
+  const walk = n => {
+    if (n.nodeType === 3) { out.push(n); return; }
+    if (n.nodeType !== 1) return;
+    if (n.classList && (n.classList.contains("math-src") || n.classList.contains("marks"))) return;
+    [...n.childNodes].forEach(walk);
+  };
+  [...$("#paperBody").childNodes].forEach(walk);
+  return out;
+}
+function countMatches(q) {
+  if (!q) return 0;
+  const needle = q.toLowerCase();
+  let n = 0;
+  paperTextNodes().forEach(t => {
+    const s = t.data.toLowerCase();
+    let i = s.indexOf(needle);
+    while (i >= 0) { n++; i = s.indexOf(needle, i + needle.length); }
+  });
+  return n;
+}
+function findPaint() {
+  const q = $("#findQ").value;
+  const info = $("#findInfo");
+  if (!info) return;
+  if (!q) { info.textContent = ""; return; }
+  const n = countMatches(q);
+  info.textContent = n ? n + " match" + (n === 1 ? "" : "es") : "no matches";
+}
+let findFrom = { node: null, offset: 0 };
+function findNext() {
+  const q = ($("#findQ").value || "");
+  if (!q) return false;
+  const needle = q.toLowerCase(), nodes = paperTextNodes();
+  if (!nodes.length) return false;
+  let startIdx = findFrom.node ? nodes.indexOf(findFrom.node) : -1;
+  if (startIdx < 0) startIdx = 0;
+  for (let k = 0; k <= nodes.length; k++) {
+    const idx = (startIdx + k) % nodes.length;
+    const t = nodes[idx];
+    const from = (idx === startIdx && findFrom.node === t) ? Math.min(findFrom.offset, t.data.length) : 0;
+    let at = t.data.toLowerCase().indexOf(needle, from);
+    if (at < 0 && from > 0) at = t.data.toLowerCase().indexOf(needle); // wrap inside the node
+    if (at >= 0) {
+      const r = document.createRange();
+      r.setStart(t, at); r.setEnd(t, at + q.length);
+      const sel = window.getSelection();
+      sel.removeAllRanges(); sel.addRange(r);
+      findFrom = { node: t, offset: at + q.length };
+      try { const rc = r.getBoundingClientRect(); if (rc && rc.top < 90 && r.startContainer.parentElement.scrollIntoView) r.startContainer.parentElement.scrollIntoView({ block: "center" }); } catch {}
+      return true;
+    }
+  }
+  return false;
+}
+function replaceOne() {
+  const q = $("#findQ").value, repl = $("#findR").value;
+  if (!q) return;
+  if (!findNext()) { findPaint(); return; }
+  const sel = window.getSelection();
+  const node = sel.anchorNode, at = sel.anchorOffset;
+  if (node && node.nodeType === 3) {
+    node.data = node.data.slice(0, at) + repl + node.data.slice(at + q.length);
+    findFrom = { node, offset: at + repl.length };
+    histSnap(true);
+  }
+  findPaint();
+}
+function replaceAllHere() {
+  const q = $("#findQ").value, repl = $("#findR").value;
+  if (!q) return;
+  const needle = q.toLowerCase();
+  let n = 0;
+  paperTextNodes().forEach(t => {
+    const s = t.data, low = s.toLowerCase();
+    if (low.indexOf(needle) < 0) return;
+    let out = "", i = 0;
+    while (i < s.length) {
+      const at = low.indexOf(needle, i);
+      if (at < 0) { out += s.slice(i); break; }
+      out += s.slice(i, at) + repl;
+      i = at + needle.length;
+      n++;
+    }
+    t.data = out;
+  });
+  findFrom = { node: null, offset: 0 };
+  if (n) histSnap(true);
+  findPaint();
+  toast(n ? "Replaced " + n + " occurrence" + (n === 1 ? "" : "s") : "No matches");
+}
+$("#btnFind").addEventListener("click", () => {
+  const bar = $("#findBar"), btn = $("#btnFind");
+  const open = bar.hidden;
+  bar.hidden = !open;
+  btn.setAttribute("aria-pressed", String(open));
+  if (open) { $("#findQ").focus(); findPaint(); }
+});
+$("#findClose").onclick = () => { $("#findBar").hidden = true; $("#btnFind").setAttribute("aria-pressed", "false"); };
+$("#btnFindNext").onclick = () => { if (!findNext()) toast("No matches"); findPaint(); };
+$("#btnReplaceOne").onclick = replaceOne;
+$("#btnReplaceAll").onclick = replaceAllHere;
+$("#findQ").addEventListener("input", () => { findFrom = { node: null, offset: 0 }; findPaint(); });
+$("#findQ").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); $("#btnFindNext").click(); } });
+$("#findR").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); replaceOne(); } });
+document.addEventListener("keydown", e => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f" && !$("#findBar").hidden) {
+    e.preventDefault(); $("#findQ").focus();
+  }
+});
+
+/* ---------- Answer key page (real page break in Word + PDF) ---------- */
+function keyOn() { return $("#cKey").checked && ($("#sKey").value || "").trim().length > 0; }
+function renderKey() {
+  const el = $("#paperKey"), mk = $("#keyBreak");
+  if (!el) return;
+  const on = keyOn();
+  if (mk) mk.hidden = !on;
+  el.hidden = !on;
+  if (!on) { el.innerHTML = ""; return; }
+  const md = protectMath(($("#sKey").value || "").replace(/\r\n/g, "\n"));
+  let html = "";
+  try { html = marked.parse(md, { breaks: true }); } catch { html = "<p>" + md + "</p>"; }
+  el.innerHTML = restoreMath(html);
+  wrapMathSrc(el);
+  try {
+    renderMathInElement(el, { delimiters: [
+      { left: "$$", right: "$$", display: true }, { left: "$", right: "$", display: false },
+      { left: "\\(", right: "\\)", display: false }, { left: "\\[", right: "\\]", display: true }
+    ], throwOnError: false });
+  } catch {}
+}
+$("#cKey").addEventListener("change", () => {
+  const w = $("#keyWrap");
+  if (w) w.hidden = !$("#cKey").checked;
+  renderKey();
+});
+let keyTimer = 0;
+$("#sKey").addEventListener("input", () => { clearTimeout(keyTimer); keyTimer = setTimeout(renderKey, 400); });
+$("#btnKeyClear").onclick = () => { $("#sKey").value = ""; $("#keyStatus").textContent = ""; renderKey(); };
+$("#btnKeyAI").onclick = async () => {
+  const paper = chatPaperText();
+  if (!paper) { toast("Add questions first"); return; }
+  const st = $("#keyStatus");
+  st.className = "status"; st.textContent = "Writing solutions…";
+  try {
+    const j = await askAI({ provider: "gemini", model: aiModel, messages: [
+      { role: "system", content: "You are a teacher writing a concise answer key. Return clean Markdown only: 'Q1. …' lines with short final answers, math in $...$ LaTeX. No preamble, no code fences." },
+      { role: "user", content: "Write the answer key for this paper:\n\n" + paper }
+    ], maxTokens: 8192, timeout: 120000 });
+    $("#sKey").value = stripPaperFences((j.text || "").trim());
+    st.className = "status ok"; st.textContent = "Done.";
+    renderKey();
+  } catch (e) { st.className = "status err"; st.textContent = "Failed: " + e.message + (e.code ? ` [${e.code}]` : ""); }
+};
 
 /* ---------- Zoom ---------- */
 let zoom = 90, fitZoom = 1, currentEff = 1;
@@ -1615,6 +1818,19 @@ async function exportDocx() {
       if (ch.nodeType !== 1 || (ch.classList && ch.classList.contains("empty"))) return;
       blocksFromEl(ch).forEach(b => kids.push(b));
     });
+    // answer key → starts on its own page
+    const keyEl = $("#paperKey");
+    if (keyEl && !keyEl.hidden && keyEl.textContent.trim()) {
+      kids.push(new docx.Paragraph({
+        pageBreakBefore: true,
+        spacing: { before: 0, after: 0, line: 20, lineRule: docx.LineRuleType.AUTO },
+        children: [new docx.TextRun({ text: "", size: 2 })]
+      }));
+      [...keyEl.children].forEach(ch => {
+        if (ch.nodeType !== 1) return;
+        blocksFromEl(ch).forEach(b => kids.push(b));
+      });
+    }
     // preview footer: thin rule, custom left text, optional page number right
     const footL = ($("#fFoot").value || "").trim(), showPg = $("#cPageNum").checked;
     const HF = { font: docFonts().headWord, size: 18, color: "9ca3af" };
@@ -1672,7 +1888,8 @@ function exportDoc() {
     @page{size:A4 ${pageOrient};margin:${marginInch()}in}
     body{font-family:${f.bodyCss};font-size:12pt}h1,h2{font-family:${f.headCss};text-align:center}table{border-collapse:collapse;width:100%}th,td{border:1.5pt solid #000;padding:6px}th{background:#EDE9FE}pre{background:#F1F5F9;padding:10px}.q-body{${cols}}</style></head><body>
     <h1>${$("#sSchool").value}</h1><p style="text-align:center">${$("#sTitle").value} — ${$("#sSub").value} • ${$("#sMeta").value}</p><hr/>
-    <div class="q-body">${$("#paperBody").innerHTML}</div></body></html>`;
+    <div class="q-body">${$("#paperBody").innerHTML}</div>
+    ${keyOn() ? '<div style="page-break-before:always"></div>' + $("#paperKey").innerHTML : ""}</body></html>`;
   saveAs(new Blob(["\ufeff", html], { type: "application/msword" }), "docxzal-paper.doc");
   toast("Downloaded docxzal-paper.doc");
 }
@@ -1724,7 +1941,9 @@ function exportHtml() {
     `pre{background:#22201c;color:#f0e9db;padding:12px;border-radius:8px;overflow:auto}` +
     `blockquote{border-left:3px solid #b26a2b;background:#faf6ee;padding:6px 12px;margin:10px 0}</style></head><body>` +
     `<h1>${H("pSchool")}</h1><h2 style="text-align:center">${H("pTitle")}</h2>` +
-    `<p style="text-align:center">${H("pMeta")}</p><hr><p>${H("pInstr")}</p>${body.innerHTML}</body></html>`;
+    `<p style="text-align:center">${H("pMeta")}</p><hr><p>${H("pInstr")}</p>${body.innerHTML}` +
+    (keyOn() ? `<hr style="page-break-before:always;border:0">${$("#paperKey").innerHTML}` : "") +
+    `</body></html>`;
   saveAs(new Blob([html], { type: "text/html" }), "docxzal-paper.html");
   toast("Downloaded docxzal-paper.html");
 }
